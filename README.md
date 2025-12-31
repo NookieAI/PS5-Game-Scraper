@@ -20,31 +20,6 @@ An Electron-based desktop app that scrapes PS5 game download links from dlpsgame
 - Node.js (v14 or higher)
 - npm
 
-### Steps
-1. Clone the repository:
-   ```
-   git clone https://github.com/NookieAI/PS5-Game-Scraper.git
-   cd PS5-Game-Scraper
-   ```
-
-2. Install dependencies:
-   ```
-   npm install
-   ```
-
-3. Run the app:
-   ```
-   npm start
-   ```
-
-### Building for Distribution
-To build executables for your platform:
-```
-npm run build
-```
-
-This uses Electron Builder to create distributable packages.
-
 ## Usage
 
 1. Launch the app.
@@ -82,16 +57,6 @@ To modify:
 - Update `renderer.js` for logic.
 - Modify `main.js` for Electron setup or IPC.
 
-## Contributing
-
-1. Fork the repo.
-2. Create a feature branch.
-3. Make changes and test.
-4. Submit a pull request.
-
-## License
-
-This project is open-source under the MIT License. See LICENSE for details.
 
 ## Disclaimer
 
