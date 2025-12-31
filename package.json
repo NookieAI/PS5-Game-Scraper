@@ -16,7 +16,8 @@
   },
   "dependencies": {
     "axios": "^1.4.0",
-    "cheerio": "^1.0.0"
+    "cheerio": "^1.0.0",
+    "fuse.js": "^6.6.2"
   },
   "build": {
     "appId": "com.nookie.ps5scraper",
