@@ -1,5 +1,7 @@
 # PS5 Game Scraper
 
+<img width="1891" height="931" alt="image" src="https://github.com/user-attachments/assets/922459ec-b18d-4083-bb34-88dd99263c28" />
+
 An Electron-based desktop app that scrapes PS5 game download links from dlpsgame.com, displaying them with covers, details, and direct download links to Akira and Viking hosts. Now with offline support via persistent local cache!
 
 ## Features
