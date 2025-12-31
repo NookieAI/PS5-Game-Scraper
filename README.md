@@ -14,13 +14,6 @@ An Electron-based desktop app that scrapes PS5 game download links from dlpsgame
 - **Progress Tracking**: Visual progress bar and status updates during scraping.
 - **Cache Management**: Clear cache or let it auto-update with newer links.
 - **Cross-Platform**: Built with Electron for Windows, macOS, and Linux.
-
-## Screenshots
-
-*(Add screenshots here if desired)*
-
-## Installation
-
 ### Prerequisites
 - Node.js (v14 or higher)
 - npm
@@ -106,7 +99,3 @@ This app scrapes public websites for educational purposes. Respect copyright law
 
 - Issues: [GitHub Issues](https://github.com/NookieAI/PS5-Game-Scraper/issues)
 - Discord: Join [Nookie_65120's Server](https://discord.gg/nj45kDSBEd)
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for version history.
