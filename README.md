@@ -2,7 +2,7 @@
 
 <img width="1887" height="904" alt="image" src="https://github.com/user-attachments/assets/cc1979c6-93d3-4131-b826-6c31a9dc360f" />
 
-A desktop application built with Electron that scrapes PS5 game data from dlpsgame.com, extracting Akira and Viking download links for easy access to game updates and patches.
+A desktop application built with Electron that scrapes PS5 game data, extracting Akira and Viking download links for easy access to game updates and patches.
 
 ## Features
 
