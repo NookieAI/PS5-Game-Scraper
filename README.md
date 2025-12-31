@@ -1,4 +1,4 @@
-# PS5 Game Scraper v1.0
+# PS5 Game Scraper
 
 <img width="1887" height="904" alt="image" src="https://github.com/user-attachments/assets/cc1979c6-93d3-4131-b826-6c31a9dc360f" />
 
