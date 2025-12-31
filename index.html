@@ -125,38 +125,83 @@
     }
     #results {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
       gap: 20px;
       justify-content: center;
     }
     .game-card {
       background: #333333;
       border: 1px solid #555555;
-      padding: 20px;
+      padding: 10px;
       border-radius: 12px;
       box-shadow: 0 8px 16px rgba(0, 0, 0, 0.8);
       transition: all 0.3s ease;
-      max-width: 250px;
+      max-width: 125px;
       margin: 0 auto;
+      cursor: pointer;
     }
     .game-card:hover {
       transform: translateY(-5px);
       box-shadow: 0 12px 24px rgba(0, 0, 0, 1);
     }
     .game-title {
-      font-size: 18px;
+      font-size: 12px;
       font-weight: bold;
-      margin-bottom: 15px;
+      margin-top: 5px;
       color: white;
       text-align: center;
       text-shadow: 0 0 15px #00d4ff;
     }
     .game-cover {
       width: 100%;
-      height: 300px;
+      height: 150px;
       object-fit: cover;
       border-radius: 8px;
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.8);
+    }
+    .game-details {
+      font-size: 10px;
+      color: #aaa;
+      margin-top: 5px;
+      line-height: 1.4;
+      border-top: 1px solid #555555;
+      padding-top: 5px;
+      text-align: center;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.9);
+    }
+    .modal-content {
+      background-color: #333333;
+      margin: 5% auto;
+      padding: 20px;
+      border: 1px solid #555555;
+      width: 40%;
+      border-radius: 12px;
+      max-height: 80%;
+      overflow-y: auto;
+    }
+    .modal-content .game-cover {
+      height: 250px;
+      object-fit: contain;
+      box-shadow: none;
+    }
+    .close {
+      color: #aaa;
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .close:hover {
+      color: white;
     }
     .links-section h3 {
       margin: 15px 0 10px;
@@ -183,14 +228,6 @@
       text-decoration: underline;
       color: #0056b3;
     }
-    .game-details {
-      font-size: 12px;
-      color: #aaa;
-      margin-top: 15px;
-      line-height: 1.4;
-      border-top: 1px solid #555555;
-      padding-top: 10px;
-    }
     /* Responsive */
     @media (max-width: 768px) {
       .button-container {
@@ -200,7 +237,15 @@
       .search-container {
         max-width: none;
       }
-      #results { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+      #results { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); }
+      .game-card { max-width: 100px; }
+      .game-cover { height: 120px; }
+      .modal-content {
+        width: 80%;
+      }
+      .modal-content .game-cover {
+        height: 200px;
+      }
     }
   </style>
 </head>
@@ -226,6 +271,13 @@
       <div id="progressText">0/0</div>
     </div>
     <div id="results"></div>
+  </div>
+
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <div id="modal-body"></div>
+    </div>
   </div>
 
   <script src="renderer.js"></script>

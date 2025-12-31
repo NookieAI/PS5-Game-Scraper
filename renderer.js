@@ -16,6 +16,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const searchInput = document.getElementById('searchInput');
   const notificationDiv = document.getElementById('notification');
   const discordLink = document.getElementById('discord-link');
+  const modal = document.getElementById('modal');
+  const modalBody = document.getElementById('modal-body');
+  const closeBtn = document.querySelector('.close');
 
   const BASE_URL = 'https://dlpsgame.com';
   let isCancelled = false;
@@ -114,9 +117,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Function to create a game card in the UI
-  function createGameCard(gameTitle, akiraLinks, vikingLinks, cover, voice, subtitles, notes, size) {
+  function createGameCard(gameTitle, cover, voice, subtitles, notes, size) {
     const card = document.createElement('div');
     card.className = 'game-card';
+    card.dataset.title = gameTitle; // Store title for modal
     
     if (cover) {
       const img = document.createElement('img');
@@ -126,26 +130,64 @@ document.addEventListener('DOMContentLoaded', () => {
       card.appendChild(img);
     }
     
-    // Add line breaks between cover and title
-    card.appendChild(document.createElement('br'));
-    card.appendChild(document.createElement('br'));
-    
     const title = document.createElement('div');
     title.className = 'game-title';
     title.textContent = gameTitle;
     card.appendChild(title);
     
-    if (akiraLinks.length > 0) {
+    const details = document.createElement('div');
+    details.className = 'game-details';
+    let detailsText = '';
+    if (voice) detailsText += `Voice: ${voice} | `;
+    if (subtitles) detailsText += `Subtitles: ${subtitles} | `;
+    if (notes) detailsText += `Notes: ${notes} | `;
+    if (size) detailsText += `Size: ${size}`;
+    details.textContent = detailsText.replace(/ \| $/, '');
+    if (detailsText) card.appendChild(details);
+    
+    card.addEventListener('click', () => showModal(gameTitle));
+    
+    return card;
+  }
+
+  // Function to show modal with game details and links
+  function showModal(gameTitle) {
+    const data = gamesData[gameTitle];
+    if (!data) return;
+    
+    modalBody.innerHTML = '';
+    
+    // Cover
+    if (data.cover) {
+      const img = document.createElement('img');
+      img.src = data.cover.startsWith('http') ? data.cover : `${BASE_URL}${data.cover}`;
+      img.alt = gameTitle;
+      img.className = 'game-cover';
+      modalBody.appendChild(img);
+    }
+    
+    // Details
+    const details = document.createElement('div');
+    details.className = 'game-details';
+    let detailsText = '';
+    if (data.voice) detailsText += `Voice: ${data.voice} | `;
+    if (data.subtitles) detailsText += `Subtitles: ${data.subtitles} | `;
+    if (data.notes) detailsText += `Notes: ${data.notes} | `;
+    if (data.size) detailsText += `Size: ${data.size}`;
+    details.textContent = detailsText.replace(/ \| $/, '');
+    if (detailsText) modalBody.appendChild(details);
+    
+    // Akira Links
+    if (data.akira && data.akira.length > 0) {
       const akiraSection = document.createElement('div');
       akiraSection.className = 'links-section';
       akiraSection.innerHTML = '<h3>Akira Links:</h3>';
       const akiraList = document.createElement('ul');
       akiraList.className = 'link-list';
-      akiraLinks.forEach(item => {
+      data.akira.forEach(item => {
         const li = document.createElement('li');
         const a = document.createElement('a');
         a.href = item.link;
-        // Format: "PPSAXXXX (REGION) - (vXX.XXX.XXX)"
         let displayText = '';
         const ppsaMatch = item.version.match(/PPSA\d+ – [A-Z]{3}/g);
         if (ppsaMatch) {
@@ -163,20 +205,20 @@ document.addEventListener('DOMContentLoaded', () => {
         akiraList.appendChild(li);
       });
       akiraSection.appendChild(akiraList);
-      card.appendChild(akiraSection);
+      modalBody.appendChild(akiraSection);
     }
     
-    if (vikingLinks.length > 0) {
+    // Viking Links
+    if (data.viking && data.viking.length > 0) {
       const vikingSection = document.createElement('div');
       vikingSection.className = 'links-section';
       vikingSection.innerHTML = '<h3>Viking Links:</h3>';
       const vikingList = document.createElement('ul');
       vikingList.className = 'link-list';
-      vikingLinks.forEach(item => {
+      data.viking.forEach(item => {
         const li = document.createElement('li');
         const a = document.createElement('a');
         a.href = item.link;
-        // Format: "PPSAXXXX (REGION) - (vXX.XXX.XXX)"
         let displayText = '';
         const ppsaMatch = item.version.match(/PPSA\d+ – [A-Z]{3}/g);
         if (ppsaMatch) {
@@ -194,20 +236,10 @@ document.addEventListener('DOMContentLoaded', () => {
         vikingList.appendChild(li);
       });
       vikingSection.appendChild(vikingList);
-      card.appendChild(vikingSection);
+      modalBody.appendChild(vikingSection);
     }
     
-    const details = document.createElement('div');
-    details.className = 'game-details';
-    let detailsText = '';
-    if (voice) detailsText += `Voice: ${voice} | `;
-    if (subtitles) detailsText += `Subtitles: ${subtitles} | `;
-    if (notes) detailsText += `Notes: ${notes} | `;
-    if (size) detailsText += `Size: ${size}`;
-    details.textContent = detailsText.replace(/ \| $/, '');
-    if (detailsText) card.appendChild(details);
-    
-    return card;
+    modal.style.display = 'block';
   }
 
   // Function to display results
@@ -215,7 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
     resultsDiv.innerHTML = '';
     const sorted = Object.entries(data).sort(([a], [b]) => a.localeCompare(b));
     for (const [gameTitle, links] of sorted) {
-      const card = createGameCard(gameTitle, links.akira || [], links.viking || [], links.cover, links.voice, links.subtitles, links.notes, links.size);
+      const card = createGameCard(gameTitle, links.cover, links.voice, links.subtitles, links.notes, links.size);
       resultsDiv.appendChild(card);
     }
   }
@@ -275,7 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log(`Processing: ${globalIdx + 1}/${gameUrls.length} - ${gameTitle}`);
         const data = await scrapeGamePage(url);
         const rawTitle = data.metaDesc || data.title || gameTitle;
-        const cleanedTitle = rawTitle.split(' Download')[0].split(' ISO')[0].split(' Torrent')[0].trim();
+        const cleanedTitle = rawTitle.split(' Download')[0].split(' ISO')[0].split(' Torrent')[0].trim().replace(/\s+PS5$/i, '');
         const finalTitle = cleanedTitle || rawTitle;
         return { finalTitle, data };
       });
@@ -377,6 +409,17 @@ document.addEventListener('DOMContentLoaded', () => {
       const title = card.querySelector('.game-title').textContent.toLowerCase();
       card.style.display = title.includes(query) ? 'block' : 'none';
     });
+  });
+
+  // Modal close
+  closeBtn.addEventListener('click', () => {
+    modal.style.display = 'none';
+  });
+
+  window.addEventListener('click', (event) => {
+    if (event.target === modal) {
+      modal.style.display = 'none';
+    }
   });
 
   scrapeBtn.addEventListener('click', () => {
