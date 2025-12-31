@@ -29,13 +29,22 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
-  // Function to show notifications
+  // Function to show notifications (only for errors now)
   function showNotification(message, type = 'info') {
     notificationDiv.textContent = message;
     notificationDiv.style.background = type === 'error' ? '#e74c3c' : type === 'success' ? '#27ae60' : '#3498db';
     notificationDiv.style.display = 'block';
     setTimeout(() => {
       notificationDiv.style.display = 'none';
+    }, 5000);
+  }
+
+  // Function to show status with auto-hide
+  function showStatus(message) {
+    statusDiv.textContent = message;
+    statusDiv.classList.add('show');
+    setTimeout(() => {
+      statusDiv.classList.remove('show');
     }, 5000);
   }
 
@@ -117,7 +126,8 @@ document.addEventListener('DOMContentLoaded', () => {
       card.appendChild(img);
     }
     
-    // Add line break between cover and title
+    // Add line breaks between cover and title
+    card.appendChild(document.createElement('br'));
     card.appendChild(document.createElement('br'));
     
     const title = document.createElement('div');
@@ -226,6 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Main scraping function
   async function runScraper() {
     console.log('Starting scraper');
+    const startTime = Date.now(); // Track start time
     isCancelled = false;
     setButtonsDuringScan(true);
     retryBtn.style.display = 'none';
@@ -288,18 +299,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (progressText) progressText.textContent = `${completed}/${gameUrls.length}`;
         if (statusDiv) statusDiv.textContent = `Scraping... ${completed}/${gameUrls.length}`;
       });
+      
+      // Add random delay between batches to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, Math.random() * 1000));
     }
     
     if (progressBar) progressBar.value = gameUrls.length;
     if (progressText) progressText.textContent = `${gameUrls.length}/${gameUrls.length}`;
-    if (statusDiv) statusDiv.textContent = isCancelled ? 'Scan cancelled.' : 'Scraping complete!';
     if (progressContainer) progressContainer.style.display = 'none';
     
     if (hasErrors && !isCancelled) {
       showNotification('Some games failed to scrape. Check console for details.', 'error');
       retryBtn.style.display = 'inline-block';
-    } else if (!isCancelled) {
-      showNotification('Scraping completed successfully!', 'success');
     }
     
     // Display results if not cancelled
@@ -308,11 +319,25 @@ document.addEventListener('DOMContentLoaded', () => {
       if (Object.keys(gamesData).length === 0) {
         if (resultsDiv) resultsDiv.textContent = 'No matching games found.';
       } else {
-        // Save results to cache
-        localStorage.setItem('gamesData', JSON.stringify(gamesData));
-        console.log('Saved results to cache');
+        // Check data size before saving to localStorage
+        const dataString = JSON.stringify(gamesData);
+        if (dataString.length > 5e6) { // 5MB limit
+          showNotification('Data too large for cache. Results not saved.', 'error');
+        } else {
+          localStorage.setItem('gamesData', dataString);
+          console.log('Saved results to cache');
+        }
       }
     }
+    
+    // Show status message
+    if (isCancelled) {
+      if (statusDiv) statusDiv.textContent = 'Scan cancelled.';
+    } else {
+      const duration = Math.round((Date.now() - startTime) / 1000);
+      if (statusDiv) showStatus(`Scan completed successfully in ${duration} seconds!`);
+    }
+    
     setButtonsDuringScan(false);
   }
 
