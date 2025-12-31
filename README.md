@@ -7,7 +7,7 @@ A desktop application built with Electron that scrapes PS5 game data, extracting
 ## Features
 
 ### Core Functionality
-- **Web Scraping**: Automatically fetches PS5 game lists from dlpsgame.com and scrapes individual game pages for download links.
+- **Web Scraping**: Automatically fetches PS5 game lists and scrapes individual game pages for download links.
 - **Link Extraction**: Identifies and organizes Akira (akirabox.com) and Viking (vikingfile.com) download links, formatted with PPSA codes, regions, and versions.
 - **Game Cards**: Displays games in visually appealing cards with covers, titles, and categorized links.
 - **Cache System**: Saves scraped data locally for offline viewing and quick reloads on startup.
