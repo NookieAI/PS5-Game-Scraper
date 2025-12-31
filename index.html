@@ -22,6 +22,17 @@
       text-shadow: 0 0 15px #00d4ff;
       margin-bottom: 30px;
     }
+    #status {
+      margin-bottom: 15px;
+      font-weight: bold;
+      text-align: center;
+      color: #00ff88;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+    #status.show {
+      opacity: 1;
+    }
     #notification {
       position: fixed;
       top: 20px;
@@ -38,7 +49,7 @@
     #discord-link {
       position: fixed;
       top: 10px;
-      right: 10px;
+      left: 10px;
       font-size: 12px;
       color: #7289da;
       text-decoration: none;
@@ -94,12 +105,6 @@
       box-shadow: none;
       transform: none;
     }
-    #status {
-      margin-bottom: 15px;
-      font-weight: bold;
-      text-align: center;
-      color: #00ff88;
-    }
     #progressContainer {
       margin-bottom: 20px;
       display: none;
@@ -131,6 +136,8 @@
       border-radius: 12px;
       box-shadow: 0 8px 16px rgba(0, 0, 0, 0.8);
       transition: all 0.3s ease;
+      max-width: 250px;
+      margin: 0 auto;
     }
     .game-card:hover {
       transform: translateY(-5px);
@@ -202,6 +209,7 @@
   <div id="discord-link">💬 Nookie_65120</div>
   <div class="container">
     <h1>PS5 Game Scraper</h1>
+    <div id="status">Click "Start Scraping" to begin.</div>
     <div class="button-container">
       <div class="search-container">
         <input type="text" id="searchInput" placeholder="Search games...">
@@ -213,7 +221,6 @@
         <button id="retryBtn" style="display: none;">Retry</button>
       </div>
     </div>
-    <div id="status">Click "Start Scraping" to begin.</div>
     <div id="progressContainer">
       <progress id="progressBar" value="0" max="100"></progress>
       <div id="progressText">0/0</div>
