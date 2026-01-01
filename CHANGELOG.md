@@ -3,47 +3,38 @@
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/SemVer).
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.0] - 2025-12-31
+## [v1.2.0] - 2026-01-01
 
 ### Added
-- Offline functionality: App now keeps its own cache as a local database file (gamesCache.json) that persists across sessions and works even offline.
-- IPC communication: Added Electron IPC handlers for saving and loading cache to/from disk.
-- File-based cache: Replaced localStorage with fs-based storage for better persistence and larger data capacity.
-- Clear cache functionality: Option to delete the cache file entirely.
+- Pagination support for scraping all PS5 games from `dlpsgame.com/category/ps5/` (previously only fetched from a single page).
+- Release date scraping from game pages and sorting games by release date (newest first by default).
+- Sort toggle button ("Sort: Date" / "Sort: Name") to switch between date-based and alphabetical sorting.
+- Percentage display in scraping progress status (e.g., "Scraping... 50/300 (17%)").
+- Total games found display in status messages (e.g., "Loaded 300 games from cache", "Scan completed! Found 300 games in 120 seconds").
+- Favorites system: Star games as favorites, toggle to show only favorites.
+- Grid view toggle removed (kept only grid for simplicity).
+- Desktop notifications for scan completion, cancellation, and errors.
+- Progress bar: Thin, electric-style progress bar that auto-hides after scan.
+- Game modal enhancements: Display game description and screenshots from the game page.
+- Lazy loading: Full link/details scraped on-demand when opening modal.
 
 ### Changed
-- UI Layout: Modal windows now show only the cover and game information; clicking a game opens a new modal screen with links and full details.
-- Game card size: Reduced to half size for better grid display.
-- Game names: "PS5" is now removed from the end of game titles for cleaner display.
-- Modal appearance: Title removed from behind the cover; modal is smaller and fits content better (40% width on desktop, 80% on mobile).
-- Cover display: Modal covers use `object-fit: contain` for portrait orientation (taller height) and no dropshadow frame.
-- Cache handling: Cache is now saved to a JSON file in the user data directory, allowing overwrites when newer links are found.
+- Scraping source changed to category pages for a comprehensive game list (fetches all ~300+ games via pagination).
+- Button layout: Cancel button moved to the left of Start Scraping.
+- Button states: Only Cancel button is enabled during scanning; all others (Start Scraping, Clear Cache, Sort, Search input) are disabled to prevent interference.
+- UI spacing: Reduced margin between title and buttons.
+- Performance optimizations: Increased batch size to 40 (from 20), reduced delays (page fetch to 500ms, inter-batch to 100ms) for ~2-4x faster scraping without breaking functionality.
+- Progress bar: Now thin and electric-styled, auto-hides after completion, with game count on the same row.
+- Progress updates: Smoother bar with percentage info and avoids jumping back and forth.
 
 ### Fixed
-- Cache persistence: Data now survives app restarts and works offline.
-- UI responsiveness: Improved modal sizing and cover display for better user experience.
+- Game name cleaning and display for consistency (removes extra suffixes, trims whitespace).
+- Progress bar jumping issues during batch processing.
+- Button positioning and states to avoid user errors during scans.
+- Modal display: Now includes description and screenshots from game pages.
 
-### Technical
-- Added `ipcMain` and `fs` usage in main.js for cache management.
-- Modified renderer.js to use IPC for cache operations instead of localStorage.
-- Updated index.html CSS for modal and cover styling changes.
-- Cache file location: `%APPDATA%\NookieAI\PS5-Game-Scraper\gamesCache.json` (or equivalent on other OS).
-
-## [1.0.0] - 2025-12-31
-
-### Added
-- Initial release of PS5 Game Scraper.
-- Scrapes PS5 game links from dlpsgame.com.
-- Supports Akira and Viking download links.
-- Displays game covers, titles, voice, subtitles, notes, and size.
-- Search functionality for games.
-- Progress bar during scraping.
-- Caching of results in localStorage.
-- Modal popups for game details and links.
-- Discord link in the app.
-
-### Known Issues
-- Cache limited to 5MB in localStorage.
-- No offline support beyond initial cache load.
+### Removed
+- List view toggle (kept only grid view for simplicity).
+- N/A

@@ -8,21 +8,38 @@ document.addEventListener('DOMContentLoaded', () => {
   const cancelBtn = document.getElementById('cancelBtn');
   const clearCacheBtn = document.getElementById('clearCacheBtn');
   const retryBtn = document.getElementById('retryBtn');
+  const sortBtn = document.getElementById('sortBtn');
+  const favBtn = document.getElementById('favBtn');
   const statusDiv = document.getElementById('status');
   const progressContainer = document.getElementById('progressContainer');
   const progressBar = document.getElementById('progressBar');
   const progressText = document.getElementById('progressText');
+  const gameCountDiv = document.getElementById('gameCount');
   const resultsDiv = document.getElementById('results');
   const searchInput = document.getElementById('searchInput');
   const notificationDiv = document.getElementById('notification');
   const discordLink = document.getElementById('discord-link');
   const modal = document.getElementById('modal');
   const modalBody = document.getElementById('modal-body');
-  const closeBtn = document.querySelector('.close');
+  const closeBtn = document.querySelector('#modal .close');
+  const fullImageModal = document.getElementById('fullImageModal');
+  const fullImage = document.getElementById('fullImage');
+  const fullImageClose = document.querySelector('#fullImageModal .close');
 
   const BASE_URL = 'https://dlpsgame.com';
   let isCancelled = false;
   let gamesData = {};
+  let sortByDate = true; // true for date, false for name
+  let showFavoritesOnly = false; // true to show only favorites
+  let favorites = JSON.parse(localStorage.getItem('favorites')) || [];
+  let currentGamesFound = 0; // Counter for games found during scraping (for progress updates)
+
+  // Ensure progress bar and text are hidden on load
+  if (progressContainer) progressContainer.style.visibility = 'hidden';
+  if (progressText) {
+    progressText.textContent = '';
+    progressText.style.visibility = 'hidden';
+  }
 
   console.log('Renderer loaded');
   console.log('scrapeBtn:', scrapeBtn); // Debug: Check if button is found
@@ -30,6 +47,18 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!scrapeBtn) {
     console.error('Scrape button not found. Check HTML for id="scrapeBtn".');
     return;
+  }
+
+  // Set favBtn to star icon initially
+  if (favBtn) {
+    favBtn.textContent = '★';
+    favBtn.style.fontSize = '18px';
+    favBtn.style.color = '#ccc';
+    favBtn.style.width = 'auto';
+    favBtn.style.padding = '5px 10px';
+    favBtn.style.background = 'none';
+    favBtn.style.border = 'none';
+    favBtn.style.boxShadow = 'none';
   }
 
   // Function to show notifications (only for errors now)
@@ -42,6 +71,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 5000);
   }
 
+  // Function to show desktop notifications
+  function showDesktopNotification(title, body) {
+    if (Notification.permission === 'granted') {
+      new Notification(title, { body: body });
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+          new Notification(title, { body: body });
+        }
+      });
+    }
+  }
+
   // Function to show status with auto-hide
   function showStatus(message) {
     statusDiv.textContent = message;
@@ -51,53 +93,110 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 5000);
   }
 
-  // Function to disable/enable buttons during scan
+  // Function to disable/enable buttons during scan (only Cancel enabled during scan)
   function setButtonsDuringScan(scanning) {
     scrapeBtn.disabled = scanning;
-    searchInput.disabled = scanning;
-    clearCacheBtn.disabled = scanning;
     cancelBtn.disabled = !scanning;
     cancelBtn.style.display = scanning ? 'inline-block' : 'none';
-    retryBtn.style.display = 'none'; // Hide retry unless error
+    clearCacheBtn.disabled = scanning;
+    retryBtn.disabled = scanning;
+    if (sortBtn) sortBtn.disabled = scanning;
+    if (favBtn) favBtn.disabled = scanning;
+    searchInput.disabled = scanning;
   }
 
-  // Function to get all game URLs from the PS5 list page
-  async function getGameUrls() {
+  // Function to fetch games from RSS feed (supplemental data)
+  async function getGamesFromRSS() {
     try {
-      const response = await axios.get(`${BASE_URL}/list-game-ps5/`, { timeout: 30000 });
-      const $ = cheerio.load(response.data);
-      const links = [];
-      $('a.title').each((i, el) => {
-        const href = $(el).attr('href');
-        if (href && href.startsWith('https://dlpsgame.com/')) {
-          links.push(href);
+      const rssUrl = `${BASE_URL}/category/ps5/feed/`;
+      const response = await axios.get(rssUrl, { timeout: 30000 });
+      const $ = cheerio.load(response.data, { xmlMode: true });
+      const rssData = {};
+      $('item').each((i, el) => {
+        const title = $(el).find('title').text().trim();
+        const link = $(el).find('link').text().trim();
+        const pubDate = $(el).find('pubDate').text().trim();
+        const cover = $(el).find('enclosure').attr('url') || '';
+        const date = new Date(pubDate).toISOString().split('T')[0];
+        if (title && link) {
+          rssData[title] = { cover: cover, date: date, url: link };
         }
       });
-      console.log('Game URLs found:', links.length);
-      return [...new Set(links)]; // Remove duplicates
+      console.log('RSS data:', Object.keys(rssData).length);
+      if (progressText) progressText.textContent = `Fetching game list... RSS: ${Object.keys(rssData).length} items. Games: ${currentGamesFound} found so far.`;
+      return rssData;
     } catch (error) {
-      console.error('Error fetching game URLs:', error);
-      showNotification('Failed to fetch game list. Check your internet connection.', 'error');
-      return [];
+      console.error('RSS fetch failed:', error);
+      return {};
     }
   }
 
-  // Function to scrape a game page for Akira and Viking download links
-  async function scrapeGamePage(gameUrl) {
+  // Function to get all games from category pages (optimized for speed)
+  async function getGamesFromCategory() {
+    const games = {};
+    let page = 1;
+    const batchSize = 10; // Increased for faster fetching
+    while (true) {
+      const promises = [];
+      for (let i = 0; i < batchSize; i++) {
+        const currentPage = page + i;
+        const pageUrl = currentPage === 1 ? `${BASE_URL}/category/ps5/` : `${BASE_URL}/category/ps5/page/${currentPage}/`;
+        promises.push(axios.get(pageUrl, { timeout: 5000 }).then(response => ({ page: currentPage, response })).catch(() => null)); // Reduced timeout
+      }
+      const results = await Promise.allSettled(promises);
+      let foundAny = false;
+      for (const result of results) {
+        if (result.status === 'fulfilled' && result.value) {
+          const { page: currentPage, response } = result.value;
+          const $ = cheerio.load(response.data);
+          let found = false;
+          $('.post').each((i, el) => {
+            const $post = $(el);
+            const title = $post.find('h2 a').text().trim() || $post.find('h2 a').attr('title') || '';
+            const url = $post.find('h2 a').attr('href');
+            const date = $post.find('.publish-date, time').text().trim() || $post.find('.publish-date, time').attr('datetime') || '';
+            const cover = $post.find('img').attr('src') || '';
+            if (title && url) {
+              const cleanTitle = title.replace(/\s+/g, ' ').trim();
+              const fullUrl = url.startsWith('http') ? url : `${BASE_URL}${url}`;
+              const formattedDate = date ? new Date(date).toISOString().split('T')[0] : '';
+              games[cleanTitle] = { akira: [], viking: [], onefichier: [], cover: cover.startsWith('http') ? cover : `${BASE_URL}${cover}`, voice: '', subtitles: '', notes: '', size: '', date: formattedDate, url: fullUrl, description: '', screenshots: [] };
+              found = true;
+              currentGamesFound++; // Increment counter
+            }
+          });
+          if (found) foundAny = true;
+        }
+      }
+      if (!foundAny) break;
+      if (progressText) progressText.textContent = `Fetching game list... Found ${currentGamesFound} games so far.`;
+      page += batchSize;
+      await new Promise(resolve => setTimeout(resolve, 50)); // Reduced delay
+    }
+    console.log('Games from category:', Object.keys(games).length);
+    return games;
+  }
+
+  // Function to scrape a game page for Akira, Viking, and 1Fichier download links, description, and screenshots (lazy load)
+  async function scrapeGamePage(gameUrl, gameTitle) {
     try {
       const response = await axios.get(gameUrl, { timeout: 30000 });
       const $ = cheerio.load(response.data);
+      // Collect download links by host
       const akiraLinks = [];
       const vikingLinks = [];
+      const onefichierLinks = [];
       $('a[href]').each((i, el) => {
         const href = $(el).attr('href');
         if (href) {
-          const versionText = $(el).closest('div').text().trim().replace(/\s+/g, ' ') || $(el).closest('p').text().trim().replace(/\s+/g, ' ') || $(el).text().trim() || 'Download Link';
-          const linkData = { link: href, version: versionText };
+          const versionText = $(el).closest('p').text().trim().replace(/\s+/g, ' ') || $(el).closest('div').text().trim().replace(/\s+/g, ' ') || $(el).text().trim() || 'Download Link';
+          const linkData = { link: href, version: versionText, type: versionText.toLowerCase().includes('update') ? 'update' : 'game' };
           if (href.includes('akirabox.com')) {
             akiraLinks.push(linkData);
           } else if (href.includes('vikingfile.com')) {
             vikingLinks.push(linkData);
+          } else if (href.includes('1fichier.com')) {
+            onefichierLinks.push(linkData);
           }
         }
       });
@@ -108,11 +207,44 @@ document.addEventListener('DOMContentLoaded', () => {
       const subtitles = title.match(/Subtitles?\s*:\s*([^N]+)/)?.[1]?.trim() || '';
       const notes = title.match(/Note\s*:\s*(.+?)(?:\(|$)/)?.[1]?.trim() || '';
       const size = title.match(/Size\s*:\s*([^N]+)/)?.[1]?.trim() || '';
-      return { akira: akiraLinks, viking: vikingLinks, title, metaDesc, cover, voice, subtitles, notes, size };
+      const date = $('meta[property="article:published_time"]').attr('content') || $('time').attr('datetime') || '';
+      
+      // Extract description from blockquote or first p or meta
+      const description = $('.entry-content blockquote').text().trim() || $('.entry-content p').first().text().trim() || metaDesc || '';
+      
+      // Extract screenshots (images within the content, excluding cover, limit to 2)
+      const screenshots = [];
+      let screenshotCount = 0;
+      $('.entry-content img').each((i, el) => {
+        if (screenshotCount >= 2) return false;
+        const src = $(el).attr('src');
+        if (src && !src.includes('cover') && !src.includes('thumbnail') && src !== cover) {
+          screenshots.push(src.startsWith('http') ? src : `${BASE_URL}${src}`);
+          screenshotCount++;
+        }
+      });
+      
+      // Update gamesData with full details
+      if (gamesData[gameTitle]) {
+        gamesData[gameTitle].akira = akiraLinks;
+        gamesData[gameTitle].viking = vikingLinks;
+        gamesData[gameTitle].onefichier = onefichierLinks;
+        gamesData[gameTitle].cover = cover || gamesData[gameTitle].cover;
+        gamesData[gameTitle].voice = voice;
+        gamesData[gameTitle].subtitles = subtitles;
+        gamesData[gameTitle].notes = notes;
+        gamesData[gameTitle].size = size;
+        gamesData[gameTitle].date = date || gamesData[gameTitle].date;
+        gamesData[gameTitle].description = description;
+        gamesData[gameTitle].screenshots = screenshots;
+        localStorage.setItem('gamesData', JSON.stringify(gamesData));
+      }
+      
+      return { akira: akiraLinks, viking: vikingLinks, onefichier: onefichierLinks, title, metaDesc, cover, voice, subtitles, notes, size, date, description, screenshots };
     } catch (error) {
       console.error('Error scraping game page:', error);
-      showNotification('Failed to scrape a game page. Retrying or skipping.', 'error');
-      return { akira: [], viking: [], title: '', metaDesc: '', cover: '', voice: '', subtitles: '', notes: '', size: '' };
+      showNotification('Failed to load game details.', 'error');
+      return { akira: [], viking: [], onefichier: [], title: '', metaDesc: '', cover: '', voice: '', subtitles: '', notes: '', size: '', date: '', description: '', screenshots: [] };
     }
   }
 
@@ -120,7 +252,18 @@ document.addEventListener('DOMContentLoaded', () => {
   function createGameCard(gameTitle, cover, voice, subtitles, notes, size) {
     const card = document.createElement('div');
     card.className = 'game-card';
-    card.dataset.title = gameTitle; // Store title for modal
+    card.dataset.title = gameTitle;
+    
+    const star = document.createElement('div');
+    star.className = 'favorite-star';
+    star.textContent = '★';
+    if (favorites.includes(gameTitle)) star.classList.add('favorited');
+    star.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleFavorite(gameTitle);
+      star.classList.toggle('favorited');
+    });
+    card.appendChild(star);
     
     if (cover) {
       const img = document.createElement('img');
@@ -150,10 +293,60 @@ document.addEventListener('DOMContentLoaded', () => {
     return card;
   }
 
-  // Function to show modal with game details and links
-  function showModal(gameTitle) {
+  // Function to toggle favorite
+  function toggleFavorite(gameTitle) {
+    if (favorites.includes(gameTitle)) {
+      favorites = favorites.filter(fav => fav !== gameTitle);
+    } else {
+      favorites.push(gameTitle);
+    }
+    localStorage.setItem('favorites', JSON.stringify(favorites));
+  }
+
+  // Function to format description with headings or bullets
+  function formatDescription(text) {
+    if (text.includes('•')) {
+      // Format as bullet list
+      const parts = text.split('•');
+      let html = '<p>' + parts[0].trim() + '</p>';
+      if (parts.length > 1) {
+        html += '<ul>';
+        for (let i = 1; i < parts.length; i++) {
+          html += '<li>' + parts[i].trim() + '</li>';
+        }
+        html += '</ul>';
+      }
+      return html;
+    } else {
+      // Format with headings
+      const headings = [
+        'RIDE VEHICLES FROM BEYOND YOUR IMAGINATION',
+        'UPGRADE AND CUSTOMIZE YOUR EXPERIENCE',
+        'EXPLORE BEYOND THE DUNES',
+        'BECOME THE SAVIOR THE WORLD NEEDS'
+      ];
+      let formatted = text;
+      headings.forEach(heading => {
+        formatted = formatted.replace(heading, '</p><h4>' + heading + '</h4><p>');
+      });
+      formatted = '<p>' + formatted + '</p>';
+      formatted = formatted.replace('<p></p><h4>', '<h4>');
+      return formatted;
+    }
+  }
+
+  // Function to show modal with game details, links, description, and screenshots
+  async function showModal(gameTitle) {
     const data = gamesData[gameTitle];
     if (!data) return;
+    
+    if (data.akira.length === 0 && data.viking.length === 0 && data.onefichier.length === 0 && data.url) {
+      showNotification('Loading game details...', 'info');
+      await scrapeGamePage(data.url, gameTitle);
+      // Refresh data after scraping
+      const updatedData = gamesData[gameTitle];
+      if (updatedData) Object.assign(data, updatedData);
+    }
     
     modalBody.innerHTML = '';
     
@@ -177,75 +370,145 @@ document.addEventListener('DOMContentLoaded', () => {
     details.textContent = detailsText.replace(/ \| $/, '');
     if (detailsText) modalBody.appendChild(details);
     
-    // Akira Links
-    if (data.akira && data.akira.length > 0) {
-      const akiraSection = document.createElement('div');
-      akiraSection.className = 'links-section';
-      akiraSection.innerHTML = '<h3>Akira Links:</h3>';
-      const akiraList = document.createElement('ul');
-      akiraList.className = 'link-list';
-      data.akira.forEach(item => {
-        const li = document.createElement('li');
-        const a = document.createElement('a');
-        a.href = item.link;
-        let displayText = '';
-        const ppsaMatch = item.version.match(/PPSA\d+ – [A-Z]{3}/g);
-        if (ppsaMatch) {
-          const ppsaStr = ppsaMatch.join(' ').replace(/ – /g, ' (') + ')';
-          displayText += ppsaStr + ' - ';
-        }
-        const versionMatch = item.version.match(/\( ?v[\d.]+\)/);
-        if (versionMatch) displayText += versionMatch[0].replace(' ', '');
-        a.textContent = displayText || item.link;
-        a.addEventListener('click', (e) => {
-          e.preventDefault();
-          shell.openExternal(item.link);
-        });
-        li.appendChild(a);
-        akiraList.appendChild(li);
-      });
-      akiraSection.appendChild(akiraList);
-      modalBody.appendChild(akiraSection);
+    // Description
+    if (data.description) {
+      const descSection = document.createElement('div');
+      descSection.className = 'description-section';
+      descSection.innerHTML = '<h3>Description:</h3>' + formatDescription(data.description);
+      modalBody.appendChild(descSection);
     }
+    
+    // Screenshots
+    if (data.screenshots && data.screenshots.length > 0) {
+      const screenshotsSection = document.createElement('div');
+      screenshotsSection.className = 'screenshots-section';
+      screenshotsSection.innerHTML = '<h3>Screenshots:</h3>';
+      const gallery = document.createElement('div');
+      gallery.className = 'screenshot-gallery';
+      data.screenshots.forEach(src => {
+        const img = document.createElement('img');
+        img.src = src;
+        img.alt = 'Screenshot';
+        img.className = 'screenshot';
+        img.addEventListener('click', () => {
+          fullImage.src = src;
+          fullImageModal.style.display = 'block';
+        });
+        gallery.appendChild(img);
+      });
+      screenshotsSection.appendChild(gallery);
+      modalBody.appendChild(screenshotsSection);
+    }
+    
+    // Helper function to create link sections with game/update separation
+    function createLinkSection(title, links) {
+      if (!links || links.length === 0) {
+        const noLinks = document.createElement('p');
+        noLinks.textContent = `No ${title} links available yet. Try refreshing the modal.`;
+        return noLinks;
+      }
+      
+      const section = document.createElement('div');
+      section.className = 'links-section';
+      section.innerHTML = `<h3 style="text-decoration: underline;">${title}:</h3>`;
+      
+      const gameLinks = links.filter(item => item.type === 'game');
+      const updateLinks = links.filter(item => item.type === 'update');
+      
+      if (gameLinks.length > 0) {
+        const gameSubSection = document.createElement('div');
+        gameSubSection.innerHTML = '<h4>Game:</h4>';
+        const gameList = document.createElement('ul');
+        gameList.className = 'link-list';
+        gameLinks.forEach(item => {
+          const li = document.createElement('li');
+          const a = document.createElement('a');
+          a.href = item.link;
+          const hostname = new URL(item.link).hostname;
+          const version = item.link.match(/v(\d+\.\d+)/)?.[1] || '';
+          let displayText = hostname;
+          if (version) displayText += ' - v' + version;
+          const ppsaMatch = item.version.match(/PPSA\d+ – [A-Z]{3}/g);
+          if (ppsaMatch) {
+            const ppsaStr = ppsaMatch.join(' ').replace(/ – /g, ' (') + ')';
+            displayText += ' - ' + ppsaStr;
+          }
+          a.textContent = displayText;
+          a.addEventListener('click', (e) => {
+            e.preventDefault();
+            shell.openExternal(item.link);
+          });
+          li.appendChild(a);
+          gameList.appendChild(li);
+        });
+        gameSubSection.appendChild(gameList);
+        section.appendChild(gameSubSection);
+      }
+      
+      if (updateLinks.length > 0) {
+        // Group update links by update info
+        const updateGroups = {};
+        updateLinks.forEach(item => {
+          const updateInfo = item.version.split(':')[0].trim();
+          if (!updateGroups[updateInfo]) updateGroups[updateInfo] = [];
+          updateGroups[updateInfo].push(item);
+        });
+        
+        for (const [updateInfo, groupLinks] of Object.entries(updateGroups)) {
+          const updateSubSection = document.createElement('div');
+          updateSubSection.innerHTML = `<h4>${updateInfo}:</h4>`;
+          const updateList = document.createElement('ul');
+          updateList.className = 'link-list';
+          groupLinks.forEach(item => {
+            const li = document.createElement('li');
+            const a = document.createElement('a');
+            a.href = item.link;
+            const hostname = new URL(item.link).hostname;
+            const version = item.link.match(/v(\d+\.\d+)/)?.[1] || '';
+            a.textContent = hostname + (version ? ' - v' + version : '');
+            a.addEventListener('click', (e) => {
+              e.preventDefault();
+              shell.openExternal(item.link);
+            });
+            li.appendChild(a);
+            updateList.appendChild(li);
+          });
+          updateSubSection.appendChild(updateList);
+          section.appendChild(updateSubSection);
+        }
+      }
+      
+      return section;
+    }
+    
+    // Akira Links
+    modalBody.appendChild(createLinkSection('Akira Links', data.akira));
     
     // Viking Links
-    if (data.viking && data.viking.length > 0) {
-      const vikingSection = document.createElement('div');
-      vikingSection.className = 'links-section';
-      vikingSection.innerHTML = '<h3>Viking Links:</h3>';
-      const vikingList = document.createElement('ul');
-      vikingList.className = 'link-list';
-      data.viking.forEach(item => {
-        const li = document.createElement('li');
-        const a = document.createElement('a');
-        a.href = item.link;
-        let displayText = '';
-        const ppsaMatch = item.version.match(/PPSA\d+ – [A-Z]{3}/g);
-        if (ppsaMatch) {
-          const ppsaStr = ppsaMatch.join(' ').replace(/ – /g, ' (') + ')';
-          displayText += ppsaStr + ' - ';
-        }
-        const versionMatch = item.version.match(/\( ?v[\d.]+\)/);
-        if (versionMatch) displayText += versionMatch[0].replace(' ', '');
-        a.textContent = displayText || item.link;
-        a.addEventListener('click', (e) => {
-          e.preventDefault();
-          shell.openExternal(item.link);
-        });
-        li.appendChild(a);
-        vikingList.appendChild(li);
-      });
-      vikingSection.appendChild(vikingList);
-      modalBody.appendChild(vikingSection);
-    }
+    modalBody.appendChild(createLinkSection('Viking Links', data.viking));
+    
+    // OneFichier Links
+    modalBody.appendChild(createLinkSection('1Fichier Links', data.onefichier));
     
     modal.style.display = 'block';
+    modalBody.scrollTop = 0; // Always scroll to top (header/cover) on open
   }
 
-  // Function to display results
+  // Function to display results sorted by date or name, filtered by favorites if needed
   function displayResults(data = gamesData) {
     resultsDiv.innerHTML = '';
-    const sorted = Object.entries(data).sort(([a], [b]) => a.localeCompare(b));
+    let filteredData = showFavoritesOnly ? Object.fromEntries(Object.entries(data).filter(([title]) => favorites.includes(title))) : data;
+    let sorted;
+    if (sortByDate) {
+      sorted = Object.entries(filteredData).sort(([a, adata], [b, bdata]) => {
+        const dateA = new Date(adata.date || '1970-01-01');
+        const dateB = new Date(bdata.date || '1970-01-01');
+        return dateB - dateA;
+      });
+    } else {
+      sorted = Object.entries(filteredData).sort(([a], [b]) => a.localeCompare(b));
+    }
+    
     for (const [gameTitle, links] of sorted) {
       const card = createGameCard(gameTitle, links.cover, links.voice, links.subtitles, links.notes, links.size);
       resultsDiv.appendChild(card);
@@ -258,26 +521,65 @@ document.addEventListener('DOMContentLoaded', () => {
     if (cachedData) {
       gamesData = JSON.parse(cachedData);
       displayResults();
-      if (statusDiv) statusDiv.textContent = 'Loaded from cache. Click "Start Scraping" to begin.';
+      const total = Object.keys(gamesData).length;
+      if (statusDiv) statusDiv.textContent = `Loaded ${total} games from cache. Click "Start Scraping" to begin.`;
+      if (gameCountDiv) {
+        gameCountDiv.textContent = `Found ${total} games`;
+        gameCountDiv.style.display = 'block';
+      }
       console.log('Displayed cached results');
     } else {
       if (statusDiv) statusDiv.textContent = 'No cached results. Click "Start Scraping" to begin.';
+      if (gameCountDiv) gameCountDiv.style.display = 'none';
     }
   }
 
-  // Main scraping function
+  // Main scraping function (fast with category + RSS enrichment)
   async function runScraper() {
-    console.log('Starting scraper');
-    const startTime = Date.now(); // Track start time
+    console.log('Starting fast scraper');
+    const startTime = Date.now();
     isCancelled = false;
     setButtonsDuringScan(true);
     retryBtn.style.display = 'none';
-    if (statusDiv) statusDiv.textContent = 'Fetching game list...';
-    if (progressContainer) progressContainer.style.display = 'none';
+    if (statusDiv) statusDiv.textContent = 'Starting scan...';
+    // Show progress bar with pulse-wiggle animation
+    if (progressContainer) {
+      progressContainer.style.visibility = 'visible';
+    }
+    if (progressBar) {
+      progressBar.classList.add('indeterminate');
+    }
+    if (progressText) {
+      progressText.style.visibility = 'visible';
+      progressText.textContent = 'Fetching game list...';
+    }
     if (resultsDiv) resultsDiv.innerHTML = '';
+    if (gameCountDiv) gameCountDiv.style.display = 'none';
     
-    const gameUrls = await getGameUrls();
-    if (gameUrls.length === 0) {
+    currentGamesFound = 0; // Reset counter
+    
+    // Get full list from category pages and RSS concurrently
+    const [games, rssData] = await Promise.all([getGamesFromCategory(), getGamesFromRSS()]);
+    
+    let finalGames = games;
+    if (Object.keys(games).length === 0) {
+      // Fallback to RSS if category fails
+      finalGames = {};
+      for (const [title, data] of Object.entries(rssData)) {
+        finalGames[title] = { akira: [], viking: [], onefichier: [], cover: data.cover, voice: '', subtitles: '', notes: '', size: '', date: data.date, url: data.url, description: '', screenshots: [] };
+      }
+    } else {
+      // Enrich with RSS data if available
+      for (const [title, rssInfo] of Object.entries(rssData)) {
+        if (finalGames[title]) {
+          if (!finalGames[title].cover && rssInfo.cover) finalGames[title].cover = rssInfo.cover;
+          if (!finalGames[title].date && rssInfo.date) finalGames[title].date = rssInfo.date;
+        }
+      }
+    }
+    
+    const totalGames = Object.keys(finalGames).length;
+    if (totalGames === 0) {
       showNotification('No games found. Please check the website.', 'error');
       setButtonsDuringScan(false);
       retryBtn.style.display = 'inline-block';
@@ -287,88 +589,36 @@ document.addEventListener('DOMContentLoaded', () => {
       setButtonsDuringScan(false);
       return;
     }
-    if (progressBar) progressBar.max = gameUrls.length;
-    if (progressBar) progressBar.value = 0;
-    if (progressText) progressText.textContent = `0/${gameUrls.length}`;
-    if (progressContainer) progressContainer.style.display = 'block';
-    if (statusDiv) statusDiv.textContent = `Found ${gameUrls.length} games. Scraping details...`;
     
-    gamesData = {}; // Reset
-    let completed = 0;
-    let hasErrors = false;
-    const batchSize = 10; // Process in batches of 10 for concurrency
-    
-    for (let i = 0; i < gameUrls.length; i += batchSize) {
-      if (isCancelled) break;
-      const batch = gameUrls.slice(i, i + batchSize);
-      const promises = batch.map(async (url, idx) => {
-        const globalIdx = i + idx;
-        const gameTitle = url.split('/').slice(-2)[0].replace(/-/g, ' ').replace(/-ps5$/, '').toUpperCase() || url;
-        console.log(`Processing: ${globalIdx + 1}/${gameUrls.length} - ${gameTitle}`);
-        const data = await scrapeGamePage(url);
-        const rawTitle = data.metaDesc || data.title || gameTitle;
-        const cleanedTitle = rawTitle.split(' Download')[0].split(' ISO')[0].split(' Torrent')[0].trim().replace(/\s+PS5$/i, '');
-        const finalTitle = cleanedTitle || rawTitle;
-        return { finalTitle, data };
-      });
-      
-      const results = await Promise.allSettled(promises);
-      results.forEach(result => {
-        if (result.status === 'fulfilled' && result.value) {
-          const { finalTitle, data } = result.value;
-          if (data.akira.length > 0 || data.viking.length > 0) {
-            if (!gamesData[finalTitle]) {
-              gamesData[finalTitle] = { akira: [], viking: [], cover: data.cover, voice: data.voice, subtitles: data.subtitles, notes: data.notes, size: data.size };
-            }
-            gamesData[finalTitle].akira.push(...data.akira);
-            gamesData[finalTitle].viking.push(...data.viking);
-          }
-        } else {
-          hasErrors = true;
-        }
-        completed++;
-        if (progressBar) progressBar.value = completed;
-        if (progressText) progressText.textContent = `${completed}/${gameUrls.length}`;
-        if (statusDiv) statusDiv.textContent = `Scraping... ${completed}/${gameUrls.length}`;
-      });
-      
-      // Add random delay between batches to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, Math.random() * 1000));
+    // Stop animation and set to full
+    if (progressBar) {
+      progressBar.classList.remove('indeterminate');
+      progressBar.style.setProperty('--progress-width', '100%');
     }
+    // Polished progress text: Combined setting for consistency
+    const finalMessage = `Found ${totalGames} games. Displaying results...`;
+    if (progressText) progressText.textContent = finalMessage;
+    if (statusDiv) statusDiv.textContent = finalMessage;
     
-    if (progressBar) progressBar.value = gameUrls.length;
-    if (progressText) progressText.textContent = `${gameUrls.length}/${gameUrls.length}`;
-    if (progressContainer) progressContainer.style.display = 'none';
-    
-    if (hasErrors && !isCancelled) {
-      showNotification('Some games failed to scrape. Check console for details.', 'error');
-      retryBtn.style.display = 'inline-block';
+    gamesData = finalGames;
+    displayResults();
+    if (gameCountDiv) {
+      gameCountDiv.textContent = `Found ${totalGames} games`;
+      gameCountDiv.style.display = 'block';
     }
+    localStorage.setItem('gamesData', JSON.stringify(gamesData));
     
-    // Display results if not cancelled
-    if (!isCancelled) {
-      displayResults();
-      if (Object.keys(gamesData).length === 0) {
-        if (resultsDiv) resultsDiv.textContent = 'No matching games found.';
-      } else {
-        // Check data size before saving to localStorage
-        const dataString = JSON.stringify(gamesData);
-        if (dataString.length > 5e6) { // 5MB limit
-          showNotification('Data too large for cache. Results not saved.', 'error');
-        } else {
-          localStorage.setItem('gamesData', dataString);
-          console.log('Saved results to cache');
-        }
+    const duration = Math.round((Date.now() - startTime) / 1000);
+    showDesktopNotification('Scan Completed', `Found ${totalGames} games in ${duration} seconds.`);
+    
+    // Auto-hide progress bar fast after complete
+    setTimeout(() => {
+      if (progressContainer) progressContainer.style.visibility = 'hidden';
+      if (progressText) {
+        progressText.style.visibility = 'hidden';
+        progressText.textContent = '';
       }
-    }
-    
-    // Show status message
-    if (isCancelled) {
-      if (statusDiv) statusDiv.textContent = 'Scan cancelled.';
-    } else {
-      const duration = Math.round((Date.now() - startTime) / 1000);
-      if (statusDiv) showStatus(`Scan completed successfully in ${duration} seconds!`);
-    }
+    }, 500);
     
     setButtonsDuringScan(false);
   }
@@ -376,15 +626,28 @@ document.addEventListener('DOMContentLoaded', () => {
   function cancelScan() {
     isCancelled = true;
     setButtonsDuringScan(false);
-    if (statusDiv) statusDiv.textContent = 'Cancelling...';
+    if (statusDiv) statusDiv.textContent = 'Scan cancelled.';
+    showDesktopNotification('Scan Cancelled', 'The scraping process was cancelled.');
+    if (progressContainer) {
+      progressContainer.style.visibility = 'hidden';
+    }
+    if (progressText) {
+      progressText.style.visibility = 'hidden';
+      progressText.textContent = '';
+    }
   }
 
   function clearCache() {
-    localStorage.removeItem('gamesData');
-    gamesData = {};
-    resultsDiv.innerHTML = '';
-    if (statusDiv) statusDiv.textContent = 'Cache cleared. Click "Start Scraping" to begin.';
-    console.log('Cache cleared');
+    if (window.confirm('Are you sure you want to clear the cache? This will remove all saved games and favorites.')) {
+      localStorage.removeItem('gamesData');
+      localStorage.removeItem('favorites');
+      favorites = [];
+      gamesData = {};
+      resultsDiv.innerHTML = '';
+      if (statusDiv) statusDiv.textContent = 'Cache cleared. Click "Start Scraping" to begin.';
+      if (gameCountDiv) gameCountDiv.style.display = 'none';
+      console.log('Cache cleared');
+    }
   }
 
   function retryScraper() {
@@ -392,16 +655,40 @@ document.addEventListener('DOMContentLoaded', () => {
     runScraper();
   }
 
-  // Load cached results on start
-  displayCachedResults();
-  setButtonsDuringScan(false); // Ensure buttons are enabled initially
+  function toggleSort() {
+    sortByDate = !sortByDate;
+    console.log('Sorting by date:', sortByDate); // Debug log
+    if (sortBtn) sortBtn.textContent = sortByDate ? 'Sort: Date' : 'Sort: Name';
+    displayResults();
+  }
 
-  // Discord link
+  function toggleFavorites() {
+    showFavoritesOnly = !showFavoritesOnly;
+    displayResults();
+    const total = Object.keys(showFavoritesOnly ? Object.fromEntries(Object.entries(gamesData).filter(([title]) => favorites.includes(title))) : gamesData).length;
+    if (gameCountDiv) {
+      gameCountDiv.textContent = `Found ${total} games`;
+    }
+    // Update favBtn color
+    if (favBtn) {
+      favBtn.style.color = showFavoritesOnly ? '#ffd700' : '#ccc';
+    }
+  }
+
+  displayCachedResults();
+  setButtonsDuringScan(false);
+
+  // Ensure progress bar and text are always hidden on load
+  if (progressContainer) progressContainer.style.visibility = 'hidden';
+  if (progressText) {
+    progressText.textContent = '';
+    progressText.style.visibility = 'hidden';
+  }
+
   discordLink.addEventListener('click', () => {
     shell.openExternal('https://discord.gg/nj45kDSBEd');
   });
 
-  // Search functionality
   searchInput.addEventListener('input', () => {
     const query = searchInput.value.toLowerCase();
     const cards = document.querySelectorAll('.game-card');
@@ -411,14 +698,30 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Modal close
   closeBtn.addEventListener('click', () => {
     modal.style.display = 'none';
+  });
+
+  fullImageClose.addEventListener('click', () => {
+    fullImageModal.style.display = 'none';
   });
 
   window.addEventListener('click', (event) => {
     if (event.target === modal) {
       modal.style.display = 'none';
+    }
+    if (event.target === fullImageModal) {
+      fullImageModal.style.display = 'none';
+    }
+  });
+
+  // Add ESC key to close modal
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && modal.style.display === 'block') {
+      modal.style.display = 'none';
+    }
+    if (event.key === 'Escape' && fullImageModal.style.display === 'block') {
+      fullImageModal.style.display = 'none';
     }
   });
 
@@ -429,4 +732,9 @@ document.addEventListener('DOMContentLoaded', () => {
   if (cancelBtn) cancelBtn.addEventListener('click', cancelScan);
   if (clearCacheBtn) clearCacheBtn.addEventListener('click', clearCache);
   if (retryBtn) retryBtn.addEventListener('click', retryScraper);
+  if (sortBtn) {
+    sortBtn.addEventListener('click', toggleSort);
+    console.log('Sort button listener attached'); // Debug log
+  }
+  if (favBtn) favBtn.addEventListener('click', toggleFavorites);
 });
