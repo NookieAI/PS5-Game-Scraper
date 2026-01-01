@@ -2,7 +2,6 @@
 
 Support my project! :heart: https://ko-fi.com/nookie_65120
 <img width="1891" height="931" alt="image" src="https://github.com/user-attachments/assets/640fd289-a3c1-451f-93eb-caee3b941b8e" />
-# PS5 Game Scraper v1.2.0
 
 A sleek and powerful desktop application built with Electron that scrapes and displays PS5 game information from dlpsgame.com. Designed for gamers who want an easy way to discover, search, and download PS5 games with Akira and Viking links.
 
