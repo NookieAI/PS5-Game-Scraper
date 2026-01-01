@@ -1,36 +1,31 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
 
+let mainWindow;
+
 function createWindow() {
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
-    fullscreen: false, // Restored to windowed mode
-    icon: path.join(__dirname, 'assets', 'icon1.ico'), // Set the app icon
+    icon: path.join(__dirname, 'assets/icon1.ico'), // Set the window icon
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: false,
-    },
-    show: false,
+      contextIsolation: false
+    }
   });
 
   mainWindow.loadFile('index.html');
 
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
-  });
+  // Optional: Open DevTools in development
+  // mainWindow.webContents.openDevTools();
 }
 
 app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  if (process.platform !== 'darwin') app.quit();
 });
 
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  }
+  if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
