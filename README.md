@@ -22,3 +22,5 @@ A sleek and powerful desktop application built with Electron that scrapes and di
 - **Notifications**: Desktop notifications for scan completion or cancellation.
 - **Modern UI**: Responsive design with glassy, transparent buttons for a polished look. Adapts to various screen sizes.
 - **Cross-Platform**: Runs on Windows, macOS, and Linux via Electron.
+
+For Support join Discord: https://discord.gg/f6UQSTkZDX
