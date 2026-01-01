@@ -160,7 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
               const cleanTitle = title.replace(/\s+/g, ' ').trim();
               const fullUrl = url.startsWith('http') ? url : `${BASE_URL}${url}`;
               const formattedDate = date ? new Date(date).toISOString().split('T')[0] : '';
-              games[cleanTitle] = { akira: [], viking: [], onefichier: [], cover: cover.startsWith('http') ? cover : `${BASE_URL}${cover}`, voice: '', subtitles: '', notes: '', size: '', date: formattedDate, url: fullUrl, description: '', screenshots: [] };
+              games[cleanTitle] = { akira: [], viking: [], onefichier: [], cover: cover.startsWith('http') ? cover : `${BASE_URL}${cover}`, voice: '', subtitles: '', notes: '', size: '', firmware: '', date: formattedDate, url: fullUrl, description: '', screenshots: [] };
               found = true;
               currentGamesFound++; // Increment counter
             }
@@ -190,7 +190,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const href = $(el).attr('href');
         if (href) {
           const versionText = $(el).closest('p').text().trim().replace(/\s+/g, ' ') || $(el).closest('div').text().trim().replace(/\s+/g, ' ') || $(el).text().trim() || 'Download Link';
-          const linkData = { link: href, version: versionText, type: versionText.toLowerCase().includes('update') ? 'update' : 'game' };
+          // Extract version from link or text
+          let version = href.match(/v(\d+\.\d+)/)?.[1] || versionText.match(/(\d+\.\d+)/)?.[1] || '';
+          const linkData = { link: href, version: versionText, extractedVersion: version, type: versionText.toLowerCase().includes('update') ? 'update' : 'game' };
           if (href.includes('akirabox.com')) {
             akiraLinks.push(linkData);
           } else if (href.includes('vikingfile.com')) {
@@ -205,8 +207,25 @@ document.addEventListener('DOMContentLoaded', () => {
       const cover = $('meta[property="og:image"]').attr('content') || '';
       const voice = title.match(/Voice\s*:\s*([^N]+)/)?.[1]?.trim() || '';
       const subtitles = title.match(/Subtitles?\s*:\s*([^N]+)/)?.[1]?.trim() || '';
-      const notes = title.match(/Note\s*:\s*(.+?)(?:\(|$)/)?.[1]?.trim() || '';
-      const size = title.match(/Size\s*:\s*([^N]+)/)?.[1]?.trim() || '';
+      const notes = title.match(/Note\s*:\s*([^\|]+)/)?.[1]?.trim() || '';
+      const size = title.match(/Size\s*:\s*([^\|]+)/)?.[1]?.trim() || '';
+      const fullContent = $('.entry-content').text();
+      console.log('Full content for', gameTitle, ':', fullContent.substring(0, 500)); // Debug: Log first 500 chars
+      let firmware = fullContent.match(/Working\s*([\d\.\-x\s–]+.*)/i)?.[1]?.trim() || fullContent.match(/Works on\s*([\d\.\-x\s–]+.*)/i)?.[1]?.trim() || '';
+      // Clean up extra text after versions
+      firmware = firmware.split('(')[0].trim() || firmware.split('and')[0].trim() || firmware;
+      // Simplify to lowest version and higher
+      if (firmware) {
+        const versions = firmware.match(/\d+(?=\.xx)/g);
+        if (versions && versions.length > 1) {
+          const nums = versions.map(v => parseInt(v));
+          const min = Math.min(...nums);
+          firmware = `${min}.xx and higher`;
+        } else if (versions && versions.length === 1) {
+          firmware = `${versions[0]}.xx and higher`;
+        }
+      }
+      console.log('Extracted firmware for', gameTitle, ':', firmware); // Debug: Log extracted firmware
       const date = $('meta[property="article:published_time"]').attr('content') || $('time').attr('datetime') || '';
       
       // Extract description from blockquote or first p or meta
@@ -234,22 +253,23 @@ document.addEventListener('DOMContentLoaded', () => {
         gamesData[gameTitle].subtitles = subtitles;
         gamesData[gameTitle].notes = notes;
         gamesData[gameTitle].size = size;
+        gamesData[gameTitle].firmware = firmware;
         gamesData[gameTitle].date = date || gamesData[gameTitle].date;
         gamesData[gameTitle].description = description;
         gamesData[gameTitle].screenshots = screenshots;
         localStorage.setItem('gamesData', JSON.stringify(gamesData));
       }
       
-      return { akira: akiraLinks, viking: vikingLinks, onefichier: onefichierLinks, title, metaDesc, cover, voice, subtitles, notes, size, date, description, screenshots };
+      return { akira: akiraLinks, viking: vikingLinks, onefichier: onefichierLinks, title, metaDesc, cover, voice, subtitles, notes, size, firmware, date, description, screenshots };
     } catch (error) {
       console.error('Error scraping game page:', error);
       showNotification('Failed to load game details.', 'error');
-      return { akira: [], viking: [], onefichier: [], title: '', metaDesc: '', cover: '', voice: '', subtitles: '', notes: '', size: '', date: '', description: '', screenshots: [] };
+      return { akira: [], viking: [], onefichier: [], title: '', metaDesc: '', cover: '', voice: '', subtitles: '', notes: '', size: '', firmware: '', date: '', description: '', screenshots: [] };
     }
   }
 
   // Function to create a game card in the UI
-  function createGameCard(gameTitle, cover, voice, subtitles, notes, size) {
+  function createGameCard(gameTitle, cover, voice, subtitles, notes, size, firmware) {
     const card = document.createElement('div');
     card.className = 'game-card';
     card.dataset.title = gameTitle;
@@ -280,13 +300,14 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const details = document.createElement('div');
     details.className = 'game-details';
-    let detailsText = '';
-    if (voice) detailsText += `Voice: ${voice} | `;
-    if (subtitles) detailsText += `Subtitles: ${subtitles} | `;
-    if (notes) detailsText += `Notes: ${notes} | `;
-    if (size) detailsText += `Size: ${size}`;
-    details.textContent = detailsText.replace(/ \| $/, '');
-    if (detailsText) card.appendChild(details);
+    let detailsHtml = '';
+    if (voice) detailsHtml += `Voice: ${voice} | `;
+    if (subtitles) detailsHtml += `Subtitles: ${subtitles} | `;
+    if (notes) detailsHtml += `Notes: ${notes} | `;
+    if (size) detailsHtml += `Size: ${size} | `;
+    // Firmware removed from card display
+    details.innerHTML = detailsHtml.replace(/ \| $/, '');
+    if (detailsHtml) card.appendChild(details);
     
     card.addEventListener('click', () => showModal(gameTitle));
     
@@ -362,13 +383,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Details
     const details = document.createElement('div');
     details.className = 'game-details';
-    let detailsText = '';
-    if (data.voice) detailsText += `Voice: ${data.voice} | `;
-    if (data.subtitles) detailsText += `Subtitles: ${data.subtitles} | `;
-    if (data.notes) detailsText += `Notes: ${data.notes} | `;
-    if (data.size) detailsText += `Size: ${data.size}`;
-    details.textContent = detailsText.replace(/ \| $/, '');
-    if (detailsText) modalBody.appendChild(details);
+    let detailsHtml = '';
+    if (data.voice) detailsHtml += `Voice: ${data.voice} | `;
+    if (data.subtitles) detailsHtml += `Subtitles: ${data.subtitles} | `;
+    if (data.notes) detailsHtml += `Notes: ${data.notes} | `;
+    if (data.size) detailsHtml += `Size: ${data.size} | `;
+    if (data.firmware) detailsHtml += `<span style="font-size: 13px; font-weight: bold;">Firmware: ${data.firmware}</span>`;
+    details.innerHTML = detailsHtml.replace(/ \| $/, '');
+    if (detailsHtml) modalBody.appendChild(details);
     
     // Description
     if (data.description) {
@@ -409,73 +431,37 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       const section = document.createElement('div');
-      section.className = 'links-section';
-      section.innerHTML = `<h3 style="text-decoration: underline;">${title}:</h3>`;
+      section.className = 'links-sections';
+      section.innerHTML = `<h3 style="text-decoration: underline; color: darkgreen;">${title}:</h3>`;
       
-      const gameLinks = links.filter(item => item.type === 'game');
-      const updateLinks = links.filter(item => item.type === 'update');
+      // Group by extracted version
+      const versionGroups = {};
+      links.forEach(item => {
+        const version = item.extractedVersion || 'Unknown';
+        if (!versionGroups[version]) versionGroups[version] = [];
+        versionGroups[version].push(item);
+      });
       
-      if (gameLinks.length > 0) {
-        const gameSubSection = document.createElement('div');
-        gameSubSection.innerHTML = '<h4>Game:</h4>';
-        const gameList = document.createElement('ul');
-        gameList.className = 'link-list';
-        gameLinks.forEach(item => {
+      for (const [version, groupLinks] of Object.entries(versionGroups)) {
+        const versionSubSection = document.createElement('div');
+        versionSubSection.innerHTML = `<h4>v${version}:</h4>`;
+        const versionList = document.createElement('ul');
+        versionList.className = 'link-list';
+        groupLinks.forEach(item => {
           const li = document.createElement('li');
           const a = document.createElement('a');
           a.href = item.link;
           const hostname = new URL(item.link).hostname;
-          const version = item.link.match(/v(\d+\.\d+)/)?.[1] || '';
-          let displayText = hostname;
-          if (version) displayText += ' - v' + version;
-          const ppsaMatch = item.version.match(/PPSA\d+ – [A-Z]{3}/g);
-          if (ppsaMatch) {
-            const ppsaStr = ppsaMatch.join(' ').replace(/ – /g, ' (') + ')';
-            displayText += ' - ' + ppsaStr;
-          }
-          a.textContent = displayText;
+          a.textContent = hostname;
           a.addEventListener('click', (e) => {
             e.preventDefault();
             shell.openExternal(item.link);
           });
           li.appendChild(a);
-          gameList.appendChild(li);
+          versionList.appendChild(li);
         });
-        gameSubSection.appendChild(gameList);
-        section.appendChild(gameSubSection);
-      }
-      
-      if (updateLinks.length > 0) {
-        // Group update links by update info
-        const updateGroups = {};
-        updateLinks.forEach(item => {
-          const updateInfo = item.version.split(':')[0].trim();
-          if (!updateGroups[updateInfo]) updateGroups[updateInfo] = [];
-          updateGroups[updateInfo].push(item);
-        });
-        
-        for (const [updateInfo, groupLinks] of Object.entries(updateGroups)) {
-          const updateSubSection = document.createElement('div');
-          updateSubSection.innerHTML = `<h4>${updateInfo}:</h4>`;
-          const updateList = document.createElement('ul');
-          updateList.className = 'link-list';
-          groupLinks.forEach(item => {
-            const li = document.createElement('li');
-            const a = document.createElement('a');
-            a.href = item.link;
-            const hostname = new URL(item.link).hostname;
-            const version = item.link.match(/v(\d+\.\d+)/)?.[1] || '';
-            a.textContent = hostname + (version ? ' - v' + version : '');
-            a.addEventListener('click', (e) => {
-              e.preventDefault();
-              shell.openExternal(item.link);
-            });
-            li.appendChild(a);
-            updateList.appendChild(li);
-          });
-          updateSubSection.appendChild(updateList);
-          section.appendChild(updateSubSection);
-        }
+        versionSubSection.appendChild(versionList);
+        section.appendChild(versionSubSection);
       }
       
       return section;
@@ -510,7 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     for (const [gameTitle, links] of sorted) {
-      const card = createGameCard(gameTitle, links.cover, links.voice, links.subtitles, links.notes, links.size);
+      const card = createGameCard(gameTitle, links.cover, links.voice, links.subtitles, links.notes, links.size, links.firmware);
       resultsDiv.appendChild(card);
     }
   }
@@ -566,7 +552,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Fallback to RSS if category fails
       finalGames = {};
       for (const [title, data] of Object.entries(rssData)) {
-        finalGames[title] = { akira: [], viking: [], onefichier: [], cover: data.cover, voice: '', subtitles: '', notes: '', size: '', date: data.date, url: data.url, description: '', screenshots: [] };
+        finalGames[title] = { akira: [], viking: [], onefichier: [], cover: data.cover, voice: '', subtitles: '', notes: '', size: '', firmware: '', date: data.date, url: data.url, description: '', screenshots: [] };
       }
     } else {
       // Enrich with RSS data if available

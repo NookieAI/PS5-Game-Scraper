@@ -1,6 +1,6 @@
 {
   "name": "ps5-game-scraper",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "A desktop app to scrape PS5 game download links from dlpsgame.com for Akira and Viking sources.",
   "main": "main.js",
   "scripts": {
