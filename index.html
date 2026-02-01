@@ -244,15 +244,13 @@
     }
     .modal-content {
       background-color: #333333;
-      margin: 0 auto;
+      margin: 5% auto;
       padding: 20px;
       border: 1px solid #555555;
       width: 40%;
       border-radius: 12px;
       max-height: 80%;
       overflow-y: auto;
-      top: 20px;
-      position: relative;
     }
     .modal-content .game-cover {
       height: 250px;
@@ -347,6 +345,24 @@
         height: 200px;
       }
     }
+    /* Dark Scrollbar */
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: #333333 #000000;
+    }
+    *::-webkit-scrollbar {
+      width: 12px;
+    }
+    *::-webkit-scrollbar-track {
+      background: #000000;
+    }
+    *::-webkit-scrollbar-thumb {
+      background: #333333;
+      border-radius: 6px;
+    }
+    *::-webkit-scrollbar-thumb:hover {
+      background: #555555;
+    }
   </style>
 </head>
 <body>
@@ -354,7 +370,7 @@
   <div id="discord-link">💬 Nookie_65120</div>
   <div class="container">
     <h1>PS5 Game Scraper</h1>
-    <div id="status">Click "Start Scraping" to begin.</div>
+    <div id="status">Click "Start" to begin.</div>
     <div class="button-container">
       <div class="search-container">
         <input type="text" id="searchInput" placeholder="Search games...">
@@ -366,7 +382,7 @@
         <button id="clearCacheBtn">Clear Cache</button>
         <button id="retryBtn" style="display: none;">Retry</button>
         <button id="sortBtn">Sort: Date</button>
-        <button id="favBtn">Show All</button>
+        <button id="favBtn">★</button>
       </div>
     </div>
     <div id="progressRow">
