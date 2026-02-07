@@ -1,12 +1,12 @@
 {
   "name": "ps5-game-scraper",
-  "version": "1.6.0",
-  "description": "PS5 Game Scraper Electron App",
+  "version": "1.7.0",
+  "description": "PS5 Game Scraper",
   "author": "Nookie",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder"
+    "build": "electron-builder --win portable"
   },
   "build": {
     "appId": "com.nookie.ps5scraper",
@@ -32,8 +32,9 @@
     "electron-builder": "^24.13.3"
   },
   "dependencies": {
-    "axios": "^1.4.0",
-    "cheerio": "^1.0.0-rc.12",
-    "fuse.js": "^6.6.2"
+    "axios": "1.6.7",
+    "cheerio": "1.0.0-rc.12",
+    "electron-store": "^8.2.0",
+    "fuse.js": "^7.0.0"
   }
 }
