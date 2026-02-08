@@ -18,7 +18,7 @@ jobs:
         with:
           node-version: 18
       - run: npm install
-      - run: npm run build
+      - run: npx electron-builder --win portable --publish never
       - uses: actions/upload-artifact@v4
         with:
           name: windows-portable
@@ -33,7 +33,7 @@ jobs:
         with:
           node-version: 18
       - run: npm install
-      - run: npm run build:linux
+      - run: npx electron-builder --linux AppImage --publish never
       - uses: actions/upload-artifact@v4
         with:
           name: linux-appimage
@@ -48,7 +48,7 @@ jobs:
         with:
           node-version: 18
       - run: npm install
-      - run: npm run build:mac
+      - run: npx electron-builder --mac dmg --publish never
       - uses: actions/upload-artifact@v4
         with:
           name: macos-dmg
