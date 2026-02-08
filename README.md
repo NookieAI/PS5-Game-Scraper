@@ -4,7 +4,7 @@ Support my project! :heart: https://ko-fi.com/nookie_65120
 
 # PS5 Game Scraper
 
-A desktop application built with Electron to scrape and display PS5 game download links from dlpsgame.com. It extracts links from popular hosts like Akira, Viking, and 1Fichier, along with game details such as firmware compatibility, descriptions, and screenshots.
+A Windows, Linux and Mac desktop application built with Electron to scrape and display PS5 game download links from dlpsgame.com. It extracts links from popular hosts like Akira, Viking, and 1Fichier, along with game details such as firmware compatibility, descriptions, and screenshots.
 
 ## Features
 
