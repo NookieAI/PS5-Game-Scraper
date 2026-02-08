@@ -8,7 +8,8 @@
     "build": "electron-builder --win portable",
     "build:installer": "electron-builder --win nsis",
     "build:linux": "electron-builder --linux AppImage",
-    "build:all": "electron-builder --win portable --linux AppImage"
+    "build:mac": "electron-builder --mac dmg",
+    "build:all": "electron-builder --win portable --linux AppImage --mac dmg"
   },
   "author": "Nookie",
   "license": "MIT",
@@ -58,6 +59,17 @@
       "icon": "build/icons",
       "category": "Utility",
       "artifactName": "PS5-Game-Scraper-${version}.AppImage"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "category": "public.app-category.utilities",
+      "artifactName": "PS5-Game-Scraper-${version}-mac-${arch}.dmg"
     }
   }
 }
