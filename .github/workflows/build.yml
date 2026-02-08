@@ -1,0 +1,129 @@
+name: Build
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Install dependencies
+        run: npm install
+        working-directory: Downloads/DLPSGAME
+      
+      - name: Build Windows portable
+        run: npm run build
+        working-directory: Downloads/DLPSGAME
+      
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-portable
+          path: Downloads/DLPSGAME/dist/*.exe
+          retention-days: 30
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Install dependencies
+        run: npm install
+        working-directory: Downloads/DLPSGAME
+      
+      - name: Build Linux AppImage
+        run: npm run build:linux
+        working-directory: Downloads/DLPSGAME
+      
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage
+          path: Downloads/DLPSGAME/dist/*.AppImage
+          retention-days: 30
+
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Install dependencies
+        run: npm install
+        working-directory: Downloads/DLPSGAME
+      
+      - name: Build macOS DMG
+        run: npm run build:mac
+        working-directory: Downloads/DLPSGAME
+      
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: Downloads/DLPSGAME/dist/*.dmg
+          retention-days: 30
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [build-windows, build-linux, build-mac]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    steps:
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-portable
+          path: release
+      
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-appimage
+          path: release
+      
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-dmg
+          path: release
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Release v${{ github.run_number }}
+          body: |
+            ## Downloads
+            
+            **Windows** - PS5-Game-Scraper-Portable.exe - Portable version (no installation required)
+            
+            **Linux** - PS5-Game-Scraper.AppImage - Universal Linux application
+            
+            **macOS** - PS5-Game-Scraper.dmg - Mount and drag to Applications
+          files: release/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
