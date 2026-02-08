@@ -1,6 +1,7 @@
 Support my project! :heart: https://ko-fi.com/nookie_65120
 
-<img width="944" height="464" alt="Screenshot 2026-01-01 181528" src="https://github.com/user-attachments/assets/33c9f4e3-3a66-4fd4-8b90-88052ec49a4c" />
+<img width="1920" height="1008" alt="image" src="https://github.com/user-attachments/assets/ddaa04a3-2e30-4c9a-8910-9970ce866853" />
+
 
 # PS5 Game Scraper
 
