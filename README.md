@@ -21,4 +21,4 @@ A Windows desktop application built with Electron to scrape and display PS5 game
 
 For Support join Discord: https://discord.gg/f6UQSTkZDX
 
-This is just a scraper, it does not host ANY actual game files. It only searches and displays exteranl links found online.
+This is just a scraper, it does not host ANY actual game files. It only searches and displays external links found online.
