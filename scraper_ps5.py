@@ -77,6 +77,7 @@ import time
 import base64
 import re
 import os
+import subprocess
 import traceback
 import html as _html
 from concurrent.futures import ThreadPoolExecutor, Future, as_completed, wait as fw_wait, ALL_COMPLETED
@@ -2182,7 +2183,21 @@ def main():
         save_cache()
         inter_pool.shutdown(wait=False)
         img_pool.shutdown(wait=False)
-        driver.quit()
+        try:
+            driver.quit()
+        except Exception:
+            pass
+
+        # ── Upload screenshots to R2 via rclone ────────────────────────────────
+        print("\n[rclone] Uploading PS5 screenshots to R2...")
+        try:
+            subprocess.run(
+                ["rclone", "copy", r"C:\temp\testing\ps5\screenshots_ps5", "r2:ps5", "-P"],
+                check=False,
+            )
+            print("[rclone] Upload complete.")
+        except Exception as _rclone_err:
+            print(f"[rclone] Upload failed: {_rclone_err}")
 
     print(f"\nDone! {len(cache)} entries in '{OUTPUT_JSON}'")
 
