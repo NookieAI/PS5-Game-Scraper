@@ -1,26 +1,31 @@
 """
-upload_to_r2.py — sync PS5 scraper outputs to Cloudflare R2 (bucket: ps5)
+upload_to_r2.py — sync PS5 scraper outputs to Cloudflare R2
 Reads creds from env vars: R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
                            R2_ACCOUNT_ID, R2_BUCKET
 
-R2 key layout:
-  games.json
-  games_cache.json
+R2 key layout (matches existing bucket structure):
+  games_ps5.json
+  games_ps5_cache.json
   {game-slug}/cover.jpg
   {game-slug}/screenshot_1.jpg
   ...
 
-The local screenshots/ prefix is stripped so files land at the bucket
-root level inside their game slug folder, not under screenshots/.
+The local screenshots_ps5/ prefix is stripped so files land at the bucket
+root level inside their game slug folder, not under screenshots_ps5/.
 
-SPEED: list_objects_v2() fetches ALL existing keys in one paginated bulk call,
-stores them in a set, then skips any file already in the set with zero extra
-API calls. Only genuinely new files are uploaded.
+SPEED IMPROVEMENT vs previous version
+──────────────────────────────────────
+Old: head_object() called for EVERY local file (sequential API round-trips).
+New: list_objects_v2() fetches ALL existing keys in one paginated bulk call,
+     stores them in a set, then skips any file already in the set with zero
+     extra API calls. Only genuinely new files are uploaded.
+     Runtime: ~2-5 s overhead for listing vs many minutes for head_object calls.
 """
 import os, mimetypes, sys
 from pathlib import Path
 import boto3
 from botocore.config import Config
+from botocore.exceptions import ClientError
 
 _REQUIRED_ENV = ["R2_ACCOUNT_ID", "R2_BUCKET", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"]
 _missing = [v for v in _REQUIRED_ENV if not os.environ.get(v)]
@@ -40,20 +45,25 @@ s3 = boto3.client(
     region_name="auto",
 )
 
-SCREENSHOTS_DIR = Path("screenshots")
+SCREENSHOTS_DIR = Path("screenshots_ps5")
 
 # ── Bulk-fetch all existing R2 keys once ─────────────────────────────────────
+# Much faster than calling head_object() for every local file.
+# list_objects_v2 returns up to 1000 keys per page; paginator handles all pages.
 print("Fetching existing R2 keys (one-time bulk list)...")
 _existing_keys: set[str] = set()
 paginator = s3.get_paginator("list_objects_v2")
 for page in paginator.paginate(Bucket=R2_BUCKET):
     for obj in page.get("Contents", []):
         _existing_keys.add(obj["Key"])
-print(f"  {len(_existing_keys):,} keys already in R2 bucket '{R2_BUCKET}'")
+print(f"  {len(_existing_keys):,} keys already in R2 bucket")
 
 def upload(local: Path, key: str):
+    # Fast path: key already in R2 — skip entirely, no API call needed.
+    # Images are immutable once uploaded so we never need to re-check content.
     if key in _existing_keys:
-        return  # already in R2 — skip silently
+        print(f"  skip (exists)  {key}")
+        return
     ct = mimetypes.guess_type(str(local))[0] or "application/octet-stream"
     print(f"  upload  {key}  ({local.stat().st_size:,} bytes)")
     s3.upload_file(str(local), R2_BUCKET, key, ExtraArgs={"ContentType": ct})
@@ -62,69 +72,36 @@ uploaded = 0
 skipped  = 0
 
 # ── JSON outputs ──────────────────────────────────────────────────────────────
-# Deduplicate both JSON files by 'url' before uploading.
-# Duplicates cause double entries in the game UI.
-import json as _json
-
-def _dedup_json_file(name: str) -> bool:
-    """
-    Read a JSON array file, remove duplicate entries by 'url' (first wins),
-    write it back if any dupes were found, return True if file exists.
-    """
-    p = Path(name)
-    if not p.exists():
-        print(f"  missing: {name}")
-        return False
-    try:
-        with open(p, "r", encoding="utf-8") as f:
-            data = _json.load(f)
-        if not isinstance(data, list):
-            print(f"  [WARN] {name} is not a JSON array — skipping dedup")
-            return True
-        seen_urls: set = set()
-        deduped = []
-        dupes = 0
-        for entry in data:
-            url = (entry.get("url") or "").strip().rstrip("/") + "/"
-            if url and url in seen_urls:
-                dupes += 1
-                continue
-            if url:
-                seen_urls.add(url)
-            deduped.append(entry)
-        if dupes:
-            print(f"  [dedup] {name}: removed {dupes} duplicate(s) ({len(data)} → {len(deduped)} entries)")
-            tmp = str(p) + ".tmp"
-            with open(tmp, "w", encoding="utf-8") as f:
-                _json.dump(deduped, f, ensure_ascii=False, indent=2)
-            os.replace(tmp, str(p))
-        else:
-            print(f"  [dedup] {name}: no duplicates found ({len(deduped)} entries)")
-    except Exception as e:
-        print(f"  [WARN] dedup failed for {name}: {e}")
-    return True
-
 for name in ["games_ps5.json", "games_ps5_cache.json"]:
-    if _dedup_json_file(name):
-        p = Path(name)
+    p = Path(name)
+    if p.exists():
+        # JSON files are always re-uploaded (they change every run)
         ct = mimetypes.guess_type(name)[0] or "application/octet-stream"
         print(f"  upload  {name}  ({p.stat().st_size:,} bytes)")
         s3.upload_file(str(p), R2_BUCKET, name, ExtraArgs={"ContentType": ct})
         uploaded += 1
+    else:
+        print(f"  missing: {name}")
 
 # ── Screenshots ───────────────────────────────────────────────────────────────
+# Strip the local "screenshots_ps5/" prefix so the R2 key is just:
+#   {game-slug}/cover.jpg
+#   {game-slug}/screenshot_1.jpg
+# This matches the existing bucket structure (no screenshots_ps5/ prefix in R2).
 if SCREENSHOTS_DIR.exists():
     for f in sorted(SCREENSHOTS_DIR.rglob("*")):
         if not f.is_file():
             continue
+        # e.g. screenshots_ps5/game-slug/cover.jpg → game-slug/cover.jpg
         relative_key = f.relative_to(SCREENSHOTS_DIR)
         key = str(relative_key).replace("\\", "/")
         if key in _existing_keys:
             skipped += 1
+            # Don't print individual skips for screenshots — too noisy
             continue
         upload(f, key)
         uploaded += 1
 else:
-    print("  screenshots/ not found — skipping")
+    print("  screenshots_ps5/ not found — skipping")
 
 print(f"\nDone. {uploaded} file(s) uploaded, {skipped} already existed in R2 (skipped).")
