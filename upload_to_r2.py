@@ -61,16 +61,56 @@ def upload(local: Path, key: str):
 uploaded = 0
 skipped  = 0
 
-# ── JSON outputs (always re-upload — they change every run) ──────────────────
-for name in ["games.json", "games_cache.json"]:
+# ── JSON outputs ──────────────────────────────────────────────────────────────
+# Deduplicate both JSON files by 'url' before uploading.
+# Duplicates cause double entries in the game UI.
+import json as _json
+
+def _dedup_json_file(name: str) -> bool:
+    """
+    Read a JSON array file, remove duplicate entries by 'url' (first wins),
+    write it back if any dupes were found, return True if file exists.
+    """
     p = Path(name)
-    if p.exists():
+    if not p.exists():
+        print(f"  missing: {name}")
+        return False
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            data = _json.load(f)
+        if not isinstance(data, list):
+            print(f"  [WARN] {name} is not a JSON array — skipping dedup")
+            return True
+        seen_urls: set = set()
+        deduped = []
+        dupes = 0
+        for entry in data:
+            url = (entry.get("url") or "").strip().rstrip("/") + "/"
+            if url and url in seen_urls:
+                dupes += 1
+                continue
+            if url:
+                seen_urls.add(url)
+            deduped.append(entry)
+        if dupes:
+            print(f"  [dedup] {name}: removed {dupes} duplicate(s) ({len(data)} → {len(deduped)} entries)")
+            tmp = str(p) + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                _json.dump(deduped, f, ensure_ascii=False, indent=2)
+            os.replace(tmp, str(p))
+        else:
+            print(f"  [dedup] {name}: no duplicates found ({len(deduped)} entries)")
+    except Exception as e:
+        print(f"  [WARN] dedup failed for {name}: {e}")
+    return True
+
+for name in ["games_ps5.json", "games_ps5_cache.json"]:
+    if _dedup_json_file(name):
+        p = Path(name)
         ct = mimetypes.guess_type(name)[0] or "application/octet-stream"
         print(f"  upload  {name}  ({p.stat().st_size:,} bytes)")
         s3.upload_file(str(p), R2_BUCKET, name, ExtraArgs={"ContentType": ct})
         uploaded += 1
-    else:
-        print(f"  missing: {name}")
 
 # ── Screenshots ───────────────────────────────────────────────────────────────
 if SCREENSHOTS_DIR.exists():
