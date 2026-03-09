@@ -2188,17 +2188,37 @@ def main():
         except Exception:
             pass
 
-        # ── Upload screenshots to R2 via rclone ────────────────────────────────
+        # ── Upload all outputs to R2 via rclone ────────────────────────────────
+        _BASE = r"C:\temp\testing\ps5"
+        _R2   = "r2ps5:ps5"
+
+        print("\n[rclone] Uploading JSON outputs to R2...")
+        for _json_file, _r2_key in (
+            (INPUT_JSON,  f"{_R2}/{INPUT_JSON}"),
+            (OUTPUT_JSON, f"{_R2}/{OUTPUT_JSON}"),
+        ):
+            try:
+                subprocess.run(
+                    ["rclone", "copyto",
+                     str(Path(_BASE) / _json_file), _r2_key,
+                     "--s3-no-check-bucket"],
+                    check=False,
+                )
+            except Exception as _e:
+                print(f"[rclone] JSON upload failed ({_json_file}): {_e}")
+        print("[rclone] JSON upload complete.")
+
         print("\n[rclone] Uploading PS5 screenshots to R2...")
         try:
             subprocess.run(
-                ["rclone", "copy", r"C:\temp\testing\ps5\screenshots_ps5", "r2ps5:ps5",
+                ["rclone", "copy",
+                 str(Path(_BASE) / "screenshots_ps5"), _R2,
                  "--no-traverse", "--s3-no-check-bucket", "-P"],
                 check=False,
             )
-            print("[rclone] Upload complete.")
+            print("[rclone] Screenshot upload complete.")
         except Exception as _rclone_err:
-            print(f"[rclone] Upload failed: {_rclone_err}")
+            print(f"[rclone] Screenshot upload failed: {_rclone_err}")
 
     print(f"\nDone! {len(cache)} entries in '{OUTPUT_JSON}'")
 
