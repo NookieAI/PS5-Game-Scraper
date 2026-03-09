@@ -2,13 +2,13 @@
 setlocal EnableExtensions
 
 REM Runs the PS5 scraper then syncs outputs to R2 via rclone.
-REM Requires rclone installed and an r2ps5 remote configured (see README).
+REM Requires rclone installed and an r2 remote configured (see README).
 
 set "BASE_DIR=C:\TEMP\testing\PS5"
 set "SCRAPER=%BASE_DIR%\scraper_ps5.py"
 
 if not defined RCLONE_EXE set "RCLONE_EXE=rclone"
-if not defined R2_REMOTE   set "R2_REMOTE=r2ps5"
+if not defined R2_REMOTE   set "R2_REMOTE=r2"
 
 cd /d "%BASE_DIR%" || exit /b 1
 
