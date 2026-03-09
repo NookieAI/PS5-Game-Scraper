@@ -2192,7 +2192,8 @@ def main():
         print("\n[rclone] Uploading PS5 screenshots to R2...")
         try:
             subprocess.run(
-                ["rclone", "copy", r"C:\temp\testing\ps5\screenshots_ps5", "r2:ps5", "-P"],
+                ["rclone", "copy", r"C:\temp\testing\ps5\screenshots_ps5", "r2ps5:ps5",
+                 "--no-traverse", "--s3-no-check-bucket", "-P"],
                 check=False,
             )
             print("[rclone] Upload complete.")
