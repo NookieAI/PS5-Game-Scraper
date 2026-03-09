@@ -2078,7 +2078,19 @@ def main():
         os.replace(tmp, path)
 
     def save_games():
-        atomic_write(INPUT_JSON, games)
+        # Deduplicate by URL before writing — prevents duplicate game cards in UI
+        seen_g: set = set()
+        deduped_g = []
+        for g in games:
+            url = (g.get("url") or "").strip().rstrip("/") + "/"
+            if url and url in seen_g:
+                continue
+            if url:
+                seen_g.add(url)
+            deduped_g.append(g)
+        if len(deduped_g) < len(games):
+            print(f"  [dedup] games list: removed {len(games) - len(deduped_g)} duplicate(s)")
+        atomic_write(INPUT_JSON, deduped_g)
 
     def save_cache():
         # Write in games[] order so newest games (prepended by discovery) appear first.
@@ -2101,6 +2113,19 @@ def main():
         new_games = discover_new_games(driver, known_urls)
         if new_games:
             games = new_games + games
+            # Deduplicate immediately after merging (safety net)
+            seen_merge: set = set()
+            games_deduped = []
+            for g in games:
+                u = (g.get("url") or "").strip().rstrip("/") + "/"
+                if u and u in seen_merge:
+                    continue
+                if u:
+                    seen_merge.add(u)
+                games_deduped.append(g)
+            if len(games_deduped) < len(games):
+                print(f"  [dedup] merged games list: removed {len(games) - len(games_deduped)} duplicate(s)")
+            games = games_deduped
             save_games()
             print(f"Added {len(new_games)} new game(s) to {INPUT_JSON}")
 
