@@ -1,0 +1,27 @@
+[package]
+name    = "ps5-game-browser"
+version = "1.0.0"
+edition = "2021"
+
+[features]
+# custom-protocol is activated by `cargo tauri build` for production
+# and disabled during `cargo tauri dev` to use the dev server path
+default          = ["custom-protocol"]
+custom-protocol  = ["tauri/custom-protocol"]
+
+
+[build-dependencies]
+tauri-build = { version = "1", features = [] }
+
+[dependencies]
+tauri = { version = "1", features = [ "http-all", "protocol-asset", "shell-open"] }
+serde      = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Lean release build — keeps the exe small
+[profile.release]
+panic         = "abort"
+codegen-units = 1
+lto           = true
+opt-level     = "s"
+strip         = true

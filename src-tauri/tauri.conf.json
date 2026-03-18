@@ -1,0 +1,71 @@
+{
+  "build": {
+    "beforeDevCommand":   "",
+    "beforeBuildCommand": "",
+    "devPath":   "../ui/index.html",
+    "distDir":   "../ui",
+    "withGlobalTauri": true
+  },
+  "package": {
+    "productName": "PS5 Game Browser",
+    "version":     "1.0.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "protocol": {
+        "asset":     true,
+        "assetScope": ["**"]
+      },
+      "shell": {
+        "all":   false,
+        "open":  true,
+        "scope": [{ "name": "open-url", "cmd": "open", "args": true }]
+      },
+      "http": {
+        "all":     true,
+        "request": true,
+        "scope":   ["https://*.r2.dev/**", "https://*.r2.dev"]
+      }
+    },
+    "bundle": {
+      "active":     true,
+      "targets":    "all",
+      "identifier": "com.nookie.ps5browser",
+      "icon": [
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/128x128@2x.png",
+        "icons/icon.icns",
+        "icons/icon.ico"
+      ],
+      "windows": {
+        "nsis": {
+          "installMode": "currentUser"
+        }
+      },
+      "resources": []
+    },
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' https://*.r2.dev; img-src 'self' https://*.r2.dev data: blob:; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'"
+    },
+    "updater": {
+      "active": false
+    },
+    "windows": [
+      {
+        "label":      "main",
+        "title":      "PS5 Game Browser",
+        "width":      1400,
+        "height":     900,
+        "minWidth":   800,
+        "minHeight":  600,
+        "resizable":  true,
+        "fullscreen": false,
+        "center":     true,
+        "decorations": true,
+        "fileDropEnabled": false
+      }
+    ]
+  }
+}
