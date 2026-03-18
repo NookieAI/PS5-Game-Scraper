@@ -18,10 +18,10 @@ tauri = { version = "1", features = [ "http-all", "protocol-asset", "shell-open"
 serde      = { version = "1", features = ["derive"] }
 serde_json = "1"
 
-# Pin webkit2gtk to the version wry 0.24.x was built against.
-# webkit2gtk 0.18.2 introduced API changes that break wry 0.24.11 on Linux.
+# Force webkit2gtk to 0.18.0 with v2_22 feature so wry can compile correctly.
+# Without v2_22, SettingsExt trait methods are not in scope and compilation fails.
 [target.'cfg(target_os = "linux")'.dependencies]
-webkit2gtk = "=0.18.0"
+webkit2gtk = { version = "=0.18.0", features = ["v2_22"] }
 
 # Lean release build — keeps the exe small
 [profile.release]
