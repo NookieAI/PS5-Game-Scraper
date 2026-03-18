@@ -62,7 +62,7 @@ jobs:
         include:
           - arch: x86_64-apple-darwin
             label: intel
-            runner: macos-13        # last Intel runner
+            runner: macos-12        # last Intel runner
           - arch: aarch64-apple-darwin
             label: apple-silicon
             runner: macos-latest    # arm64
