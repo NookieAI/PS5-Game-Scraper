@@ -1,4 +1,4 @@
-// PS4 Game Browser — Tauri 2 backend (production)
+// PS5 Game Browser — Tauri 2 backend (production)
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use serde::{Deserialize, Serialize};
@@ -7,19 +7,17 @@ use std::process::Command;
 use tauri::Manager;   // for app.get_webview_window() in single-instance callback
 
 const GH_OWNER: &str = "NookieAI";
-const GH_REPO:  &str = "PS4-Game-Browser";
+const GH_REPO:  &str = "PS5-Game-Scraper";
 
 // ── GitHub API types ─────────────────────────────────────────────────────────
-// Only the fields we actually use are deserialized — serde silently ignores
-// every other field in the JSON response (release name, prerelease flag,
-// author, etc). The `/releases/latest` endpoint already excludes prereleases
-// server-side, so we don't need a local bool check.
 #[derive(Deserialize)]
 struct GithubRelease {
-    tag_name: String,
-    body:     Option<String>,
-    assets:   Vec<GithubAsset>,
-    html_url: String,
+    tag_name:    String,
+    name:        Option<String>,
+    body:        Option<String>,
+    assets:      Vec<GithubAsset>,
+    html_url:    String,
+    prerelease:  bool,
 }
 
 #[derive(Deserialize)]
@@ -53,12 +51,9 @@ async fn check_for_updates() -> Result<UpdateInfo, String> {
     let release = fetch_latest_release().await
         .map_err(|e| format!("Update check failed: {e}"))?;
 
-    // Destructure so we can move fields out without cloning. Each return
-    // branch below consumes `release_url` and `notes` exactly once.
-    let GithubRelease { tag_name, body, assets, html_url } = release;
-    let latest      = tag_name.trim_start_matches('v').to_string();
-    let release_url = Some(html_url);
-    let notes       = body;
+    let latest = release.tag_name.trim_start_matches('v').to_string();
+    let release_url = Some(release.html_url.clone());
+    let notes = release.body.clone();
 
     if !is_newer(&latest, &current) {
         return Ok(UpdateInfo {
@@ -68,7 +63,7 @@ async fn check_for_updates() -> Result<UpdateInfo, String> {
         });
     }
 
-    match find_asset_for_platform(&assets) {
+    match find_asset_for_platform(&release.assets) {
         Some(asset) => Ok(UpdateInfo {
             available:    true,
             current,
@@ -80,33 +75,28 @@ async fn check_for_updates() -> Result<UpdateInfo, String> {
             notes,
             error:        None,
         }),
-        None => {
-            let err_msg = format!(
+        None => Ok(UpdateInfo {
+            available:    true,
+            current,
+            latest:       Some(latest),
+            download_url: None,
+            asset_name:   None,
+            asset_size:   None,
+            release_url,
+            notes,
+            error:        Some(format!(
                 "v{latest} is available but no installer for this platform was found on the release."
-            );
-            Ok(UpdateInfo {
-                available:    true,
-                current,
-                latest:       Some(latest),
-                download_url: None,
-                asset_name:   None,
-                asset_size:   None,
-                release_url,
-                notes,
-                error:        Some(err_msg),
-            })
-        }
+            )),
+        }),
     }
 }
 
 #[tauri::command]
 async fn install_update(download_url: String,
                         asset_name:   Option<String>) -> Result<String, String> {
-    // Download the installer to a temp file. 5min timeout covers slow
-    // connections without freezing forever on a stalled download.
+    // Download the installer to a temp file
     let client = reqwest::Client::builder()
-        .user_agent("PS4GameBrowser-Updater/1.0")
-        .timeout(std::time::Duration::from_secs(300))
+        .user_agent("PS5GameBrowser-Updater/1.0")
         .build()
         .map_err(|e| format!("client init: {e}"))?;
 
@@ -120,12 +110,12 @@ async fn install_update(download_url: String,
         .await
         .map_err(|e| format!("download body: {e}"))?;
 
-    // Prefer the API-supplied filename (preserves spaces in "PS4 Game Browser.exe"
+    // Prefer the API-supplied filename (preserves spaces in "PS5 Game Browser.exe"
     // etc). Fall back to URL basename with %20 decoded if not provided.
     let safe_name = asset_name.unwrap_or_else(|| {
         download_url.rsplit('/')
             .next()
-            .unwrap_or("ps4-game-browser-update.bin")
+            .unwrap_or("ps5-game-browser-update.bin")
             .replace("%20", " ")
     });
 
@@ -149,11 +139,8 @@ async fn fetch_latest_release() -> Result<GithubRelease, String> {
     let url = format!(
         "https://api.github.com/repos/{GH_OWNER}/{GH_REPO}/releases/latest"
     );
-    // 10s timeout for the API check — if GitHub is down or rate-limiting,
-    // fail fast rather than blocking app startup behind a hung TCP connection.
     let client = reqwest::Client::builder()
-        .user_agent("PS4GameBrowser-Updater/1.0")
-        .timeout(std::time::Duration::from_secs(10))
+        .user_agent("PS5GameBrowser-Updater/1.0")
         .build()
         .map_err(|e| e.to_string())?;
     let resp = client.get(&url).send().await.map_err(|e| e.to_string())?;
@@ -187,14 +174,20 @@ fn is_newer(latest: &str, current: &str) -> bool {
 fn find_asset_for_platform(assets: &[GithubAsset]) -> Option<&GithubAsset> {
     #[cfg(target_os = "windows")]
     {
-        // Any .exe on the release — with the custom workflow naming
-        // ("PS4 Game Browser v4.0.0.exe") there's exactly one Windows asset.
+        // Prefer the NSIS installer (x64-setup.exe) — handles file-replacement,
+        // start-menu shortcut, uninstaller. Falls back to any .exe asset.
+        if let Some(a) = assets.iter().find(|a|
+            a.name.to_lowercase().ends_with("x64-setup.exe")
+            || a.name.to_lowercase().contains("setup.exe")
+        ) {
+            return Some(a);
+        }
         return assets.iter().find(|a| a.name.to_lowercase().ends_with(".exe"));
     }
     #[cfg(target_os = "macos")]
     {
         // .dmg for Intel/ARM. Architecture detection: at runtime
-        // std::env::consts::ARCH is "aarch64" on Apple Silicon, "x86_64" on Intel.
+        // std::env::consts::ARCH is "aarch64" on M1, "x86_64" on Intel.
         let arch = std::env::consts::ARCH;
         if arch == "aarch64" {
             if let Some(a) = assets.iter().find(|a|
@@ -231,22 +224,18 @@ fn spawn_updater(downloaded: &PathBuf, current_exe: &PathBuf, pid: u32)
     const CREATE_NO_WINDOW:          u32 = 0x08000000;
 
     let script_path = std::env::temp_dir()
-        .join("ps4-game-browser-update.bat");
+        .join("ps5-game-browser-update.bat");
 
     // NSIS silent install (/S). Installer overwrites current install location,
-    // then we relaunch the newly-written exe. Wait-for-parent-exit loop is
-    // capped at ~30s to avoid infinite spin if the OS leaves a zombie process.
+    // then we relaunch the newly-written exe.
     let script = format!(
         r#"@echo off
-set /a wait_count=0
 :waitloop
 tasklist /FI "PID eq {pid}" 2>NUL | findstr /I /C:"{pid}" >NUL
-if errorlevel 1 goto proceed
-set /a wait_count+=1
-if %wait_count% GEQ 30 goto proceed
-timeout /t 1 /nobreak >nul
-goto waitloop
-:proceed
+if not errorlevel 1 (
+    timeout /t 1 /nobreak >nul
+    goto waitloop
+)
 timeout /t 1 /nobreak >nul
 "{downloaded}" /S
 timeout /t 3 /nobreak >nul
@@ -259,15 +248,8 @@ del "%~f0"
     );
     std::fs::write(&script_path, script)?;
 
-    let script_str = script_path.to_str().ok_or_else(|| {
-        std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "updater script path is not valid UTF-8",
-        )
-    })?;
-
     Command::new("cmd")
-        .args(["/C", script_str])
+        .args(&["/C", script_path.to_str().unwrap_or("")])
         .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW)
         .spawn()?;
     Ok(())
@@ -278,7 +260,7 @@ fn spawn_updater(downloaded: &PathBuf, current_exe: &PathBuf, pid: u32)
     -> Result<(), std::io::Error>
 {
     use std::os::unix::fs::PermissionsExt;
-    let script_path = std::env::temp_dir().join("ps4-game-browser-update.sh");
+    let script_path = std::env::temp_dir().join("ps5-game-browser-update.sh");
 
     let is_deb = downloaded
         .extension()
@@ -333,17 +315,17 @@ case "$DATA_TAR" in
 esac
 
 # Locate the binary inside the extracted .deb tree. Three-tier strategy:
-#   1. Tauri's standard install path (current): usr/bin/ps4-game-browser
-#   2. Any ELF executable whose name contains ps4/game/browser fragments
-#      (covers future Tauri layout changes like opt/PS4 Game Browser/)
+#   1. Tauri's standard install path (current): usr/bin/ps5-game-browser
+#   2. Any ELF executable whose name contains ps5/game/browser fragments
+#      (covers future Tauri layout changes like opt/PS5 Game Browser/)
 #   3. Any ELF executable, last resort
-NEW_BIN="$(find . -type f -name 'ps4-game-browser' | head -1)"
+NEW_BIN="$(find . -type f -name 'ps5-game-browser' | head -1)"
 
 if [ -z "$NEW_BIN" ] && command -v file >/dev/null 2>&1; then
     while IFS= read -r candidate; do
         if file -b "$candidate" 2>/dev/null | grep -q 'ELF.*executable'; then
             case "$(basename "$candidate" | tr '[:upper:]' '[:lower:]')" in
-                *ps4*|*browser*|*game*)
+                *ps5*|*browser*|*game*)
                     NEW_BIN="$candidate"
                     break
                     ;;
@@ -422,8 +404,8 @@ fn spawn_updater(downloaded: &PathBuf, current_exe: &PathBuf, pid: u32)
                 .unwrap_or_else(|| current_exe.clone())
         });
 
-    let script_path = std::env::temp_dir().join("ps4-game-browser-update.sh");
-    let mount_point = std::env::temp_dir().join("ps4-browser-update-mount");
+    let script_path = std::env::temp_dir().join("ps5-game-browser-update.sh");
+    let mount_point = std::env::temp_dir().join("ps5-browser-update-mount");
 
     // Flow:
     //   1. hdiutil attach the .dmg silently.
@@ -442,11 +424,6 @@ set -e
 while kill -0 {pid} 2>/dev/null; do sleep 0.5; done
 sleep 1
 
-# Defensive cleanup: a previous interrupted update may have left this mount
-# point still mounted (impossible to remount over) or in a non-empty state
-# (hdiutil refuses non-empty mountpoints). Detach + remove before attaching.
-hdiutil detach "{mount}" -quiet 2>/dev/null || true
-rm -rf "{mount}"
 mkdir -p "{mount}"
 hdiutil attach "{downloaded}" -mountpoint "{mount}" -nobrowse -quiet
 
@@ -473,7 +450,7 @@ if [ "$DIRECT_OK" -eq 0 ]; then
     # as root inside osascript's privileged context, so /Applications writes
     # succeed even under MDM/parental restrictions.
     ELEVATED_SCRIPT="rm -rf '{app_bundle}' && ditto '$NEW_APP' '{app_bundle}' && xattr -dr com.apple.quarantine '{app_bundle}'"
-    if ! osascript -e "do shell script \"$ELEVATED_SCRIPT\" with administrator privileges with prompt \"PS4 Game Browser needs permission to install the update.\"" >/dev/null 2>&1; then
+    if ! osascript -e "do shell script \"$ELEVATED_SCRIPT\" with administrator privileges with prompt \"PS5 Game Browser needs permission to install the update.\"" >/dev/null 2>&1; then
         # User canceled the password dialog OR ditto failed even with root.
         hdiutil detach "{mount}" -quiet || true
         rm -rf "{mount}" "{downloaded}"
@@ -526,5 +503,5 @@ fn main() {
             install_update,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running PS4 Game Browser");
+        .expect("error while running PS5 Game Browser");
 }

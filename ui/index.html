@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PS4 Game Browser</title>
+  <title>PS5 Game Browser</title>
   <style>
     html, body { min-height: 100vh; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background: #000; color: #f0f0f0; }
@@ -49,8 +49,8 @@
     #metaDetails { display: flex; flex-wrap: wrap; gap: 6px 8px; margin-bottom: 4px; justify-content: center; }
     .meta-badge { background: rgba(60,100,180,0.25); border: 1px solid rgba(100,150,255,0.2); border-radius: 5px; padding: 2px 8px; font-size: 0.78em; color: #99bbee; }
     .meta-badge b { color: #aaccff; margin-right: 3px; }
-    .meta-badge.cusa { background: rgba(0,80,40,0.3); border-color: rgba(0,200,100,0.25); color: #88ddbb; }
-    .meta-badge.cusa b { color: #55ddaa; }
+    .meta-badge.ppsa { background: rgba(0,80,40,0.3); border-color: rgba(0,200,100,0.25); color: #88ddbb; }
+    .meta-badge.ppsa b { color: #55ddaa; }
     .close { position: absolute; top: 12px; right: 16px; background: rgba(255,255,255,0.06); border: none; color: #7788aa; font-size: 1.4em; line-height: 1; cursor: pointer; padding: 4px 9px; border-radius: 6px; transition: all 0.15s; z-index: 10; }
     .close:hover { background: rgba(255,60,60,0.2); color: #ff8888; }
     .modal-body { padding: 16px 24px 20px; }
@@ -115,13 +115,13 @@
 </head>
 <body>
   <div class="container">
-    <h1>PS4 Game Browser</h1>
+    <h1>PS5 Game Browser</h1>
     <div id="socialBar">
       <a class="social-link kofi" data-href="https://ko-fi.com/nookie_65120">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M23.881 8.948c-.773-4.085-4.859-4.733-4.859-4.733H0v13.89c0 .946.778 1.745 1.73 1.745h16.365c0 0 4.583-.04 5.364-4.402.281-1.527.027-3.556-1.016-5.12l.438-.028c0 0-.035-.09-.047-.24l.047-.01c-.001-.048.006-.084.006-.084l-.002-.018zm-3.68 5.56c-.515 1.545-2.044 2.012-3.06 2.012H2.717V7.162h14.268c0 0 2.613.195 3.005 2.743.18 1.17.013 2.918-.789 4.603z"/><circle cx="17.5" cy="11.5" r="1.5"/></svg>
         Support on Ko-fi
       </a>
-      <a class="social-link" data-href="https://github.com/NookieAI/PS4-Game-Browser">
+      <a class="social-link" data-href="https://github.com/NookieAI/PS5-Game-Scraper">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
         GitHub
       </a>
@@ -179,8 +179,8 @@
 
   <script>
     // ── CONFIG ────────────────────────────────────────────────────────────────
-    const CDN   = 'https://pub-223d9963163b41669724a8fe4789d05b.r2.dev';
-    const CACHE = CDN + '/games_cache.json';
+    const CDN   = 'https://pub-d5f4def955404492b20262ad2a0dc12a.r2.dev';
+    const CACHE = CDN + '/games_ps5_cache.json';
     const PCSS  = CDN + '/ui_patch.css';
     const PJS   = CDN + '/ui_patch.js';
 
@@ -215,7 +215,7 @@
     function imgUrl(local) {
       if (!local || local === 'dead') return '';
       if (/^https?:\/\//.test(local)) return local;
-      return CDN + '/' + local.replace(/\\/g,'/').replace(/^screenshots\//,'');
+      return CDN + '/' + local.replace(/\\/g,'/').replace(/^screenshots_ps5\//,'');
     }
     const findCover = shots => { const s=(shots||[]).find(s=>s.role==='cover'); return s?imgUrl(s.local||s.url):''; };
     const findShots = shots => (shots||[]).filter(s=>s.role!=='cover').map(s=>imgUrl(s.local||s.url)).filter(Boolean);
@@ -361,13 +361,13 @@
     window.renderMirrorsHTML = renderMirrorsHTML;
 
     function toVersion(rel, idx, extra) {
-      const cusa=(rel.cusa||'').trim(), region=(rel.region||'').trim();
+      const ppsa=(rel.ppsa||'').trim(), region=(rel.region||'').trim();
       let header;
-      if (cusa&&region) header=cusa+' \u2014 '+region;
-      else if (cusa)    header=cusa;
+      if (ppsa&&region) header=ppsa+' \u2014 '+region;
+      else if (ppsa)    header=ppsa;
       else {
         const m=(rel.note||'').split('\n')[0].match(/PP\s*SA\s*(\d{5,8})\s*[\u2013\u2014-]\s*(\w+)/i);
-        header=m?'CUSA'+m[1]+' \u2014 '+m[2].toUpperCase():'Version '+(idx+1);
+        header=m?'PPSA'+m[1]+' \u2014 '+m[2].toUpperCase():'Version '+(idx+1);
       }
       const rows=[];
       if (rel.game&&rel.game.length) rows.push({label:'Game',mirrors:expandMirrors(rel.game)});
@@ -392,7 +392,7 @@
         title:e.title||'', cover:findCover(e.screenshots), screenshots:findShots(e.screenshots),
         description:e.description||'',
         meta:{
-          cusa_ids:(x.cusa_ids||[]).map(p=>((p.cusa||'').trim()+' '+(p.region||'').trim()).trim()).filter(Boolean),
+          ppsa_ids:(x.ppsa_ids||[]).map(p=>((p.ppsa||'').trim()+' '+(p.region||'').trim()).trim()).filter(Boolean),
           genre:x.genre||'', released:x.release_year||'',
           language:x.table_language||x.language||'', game_size:x.game_size||'',
         },
@@ -455,8 +455,8 @@
           modalLinks=document.getElementById('modalLinks');
 
     let allGames=[], filtered=[], currentGame=null;
-    let currentSort='date';
-    try { currentSort=localStorage.getItem('ps4SortBy')||'date'; } catch {}
+    let currentSort='title';
+    try { currentSort=localStorage.getItem('ps5SortBy')||'title'; } catch {}
 
     const setBtns=en=>{refreshBtn.disabled=!en;sortBtn.disabled=!en;};
     const showStatus=(m,ok=true)=>{statusEl.textContent=m;statusEl.style.color=ok?'#00ff88':'#ff3870';statusEl.classList.add('show');};
@@ -472,7 +472,7 @@
     sortBtn.onclick=()=>{
       if(sortBtn.disabled)return;
       currentSort=currentSort==='date'?'title':'date';
-      try{localStorage.setItem('ps4SortBy',currentSort);}catch{}
+      try{localStorage.setItem('ps5SortBy',currentSort);}catch{}
       updateSortBtn();doSearch();
     };
 
@@ -514,52 +514,37 @@
       // ── Silent auto-update check ──────────────────────────────────────────
       // Fires 8s after boot so the initial cache load runs first. Hits the
       // GitHub releases API via a Rust command (no signing, no plugin —
-      // just a version compare + installer download + spawn script).
-      //
-      // Error policy:
-      //   • check_for_updates failure → silent (it's a background check)
-      //   • install_update failure   → loud (user clicked Yes, they need
-      //                                 to know what happened so they can
-      //                                 retry or download manually)
+      // just a version compare + installer download + spawn script). If a
+      // newer release is found, user gets a confirm dialog. Decline or any
+      // failure leaves the app running normally — updater never blocks.
       setTimeout(async () => {
-        let info;
         try {
           const inv = window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke;
           if (typeof inv !== 'function') return;
-          info = await inv('check_for_updates');
-        } catch (_) { return; /* silent — background check */ }
-        if (!info || !info.available) return;
-
-        if (info.error) {
-          const go = confirm(`Update v${info.latest} available, but no automatic installer for this platform. Open release page?`);
-          if (go && info.release_url) openExternal(info.release_url);
-          return;
-        }
-
-        const sizeMb = info.asset_size ? ` (${(info.asset_size/1048576).toFixed(1)} MB)` : '';
-        const proceed = confirm(
-          `Update available: v${info.latest}${sizeMb}\n\n` +
-          `Currently running: v${info.current}\n\n` +
-          `Download and install now? The app will close and reopen automatically.`
-        );
-        if (!proceed) return;
-
-        showStatus(`Downloading v${info.latest}, this may take a minute…`);
-        try {
-          const inv = window.__TAURI_INTERNALS__.invoke;
+          const info = await inv('check_for_updates');
+          if (!info || !info.available) return;
+          if (info.error) {
+            // Update exists but no compatible asset for this platform — point
+            // user to release page instead of auto-installing.
+            const go = confirm(`Update v${info.latest} available, but no automatic installer for this platform. Open release page?`);
+            if (go && info.release_url) openExternal(info.release_url);
+            return;
+          }
+          const sizeMb = info.asset_size ? ` (${(info.asset_size/1048576).toFixed(1)} MB)` : '';
+          const proceed = confirm(
+            `Update available: v${info.latest}${sizeMb}\n\n` +
+            `Currently running: v${info.current}\n\n` +
+            `Download and install now? The app will close and reopen automatically.`
+          );
+          if (!proceed) return;
+          showStatus(`Downloading v${info.latest}…`);
           await inv('install_update', {
             downloadUrl: info.download_url,
             assetName:   info.asset_name,
           });
-        } catch (e) {
-          // Download/install failed — surface it. Don't close the window;
-          // user can keep using v${current} and retry next launch.
-          const msg = (e && e.toString && e.toString()) || 'unknown error';
-          showStatus(`Update failed: ${msg}`, false);
-          return;
-        }
-        showStatus(`Update downloaded — restarting…`);
-        setTimeout(() => window.close(), 1500);
+          showStatus(`Update downloaded — restarting…`);
+          setTimeout(() => { try { window.close(); } catch (_) {} }, 1500);
+        } catch (_) { /* silent — updater is best-effort */ }
       }, 8000);
     });
 
@@ -629,7 +614,7 @@
       if(typeof UIHooks.buildMetaBadges==='function'){metaDetails.innerHTML=UIHooks.buildMetaBadges(meta);}
       else{
         const b=[];
-        (meta.cusa_ids||[]).forEach(id=>b.push(`<span class="meta-badge cusa"><b>CUSA</b>${escH(id)}</span>`));
+        (meta.ppsa_ids||[]).forEach(id=>b.push(`<span class="meta-badge ppsa"><b>PPSA</b>${escH(id)}</span>`));
         if(meta.genre)    b.push(`<span class="meta-badge"><b>Genre</b>${escH(meta.genre)}</span>`);
         if(meta.released) b.push(`<span class="meta-badge"><b>Year</b>${escH(meta.released)}</span>`);
         if(meta.language) b.push(`<span class="meta-badge"><b>Lang</b>${escH(meta.language)}</span>`);

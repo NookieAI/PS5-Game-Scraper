@@ -6,8 +6,7 @@
   "permissions": [
     "core:default",
     "shell:allow-open",
-    "allow-check-for-updates",
-    "allow-install-update",
+    "updater:default",
     {
       "identifier": "http:default",
       "allow": [
