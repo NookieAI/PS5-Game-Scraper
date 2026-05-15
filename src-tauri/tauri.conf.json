@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "PS5 Game Browser",
+  "productName": "PS4 Game Browser",
   "version": "4.0.0",
-  "identifier": "com.nookie.ps5browser",
+  "identifier": "com.nookie.ps4browser",
   "build": {
     "frontendDist": "../ui"
   },
@@ -10,7 +10,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "PS5 Game Browser",
+        "title": "PS4 Game Browser",
         "width": 1400,
         "height": 900,
         "minWidth": 800,

@@ -1,6 +1,6 @@
 # Auto-Updater (no signing required)
 
-The app checks `https://api.github.com/repos/NookieAI/PS5-Game-Scraper/releases/latest` 8 seconds after launch. If a newer version is found, the user gets a confirmation dialog, accepts, and the app downloads + installs + relaunches.
+The app checks `https://api.github.com/repos/NookieAI/PS4-Game-Browser/releases/latest` 8 seconds after launch. If a newer version is found, the user gets a confirmation dialog, accepts, and the app downloads + installs + relaunches.
 
 **No keypair. No signing. No setup.** Just push a tag and the workflow builds + uploads bundles. Running apps pick up the new release on next launch.
 
@@ -39,7 +39,7 @@ Running apps will pick this up automatically on their next launch.
 ## Limitations
 
 - **Windows: requires `installMode: currentUser` install path.** If a user installed your app to `C:\Program Files\` manually (not via the NSIS installer), the silent install will fail with permissions. Configured correctly out-of-the-box — only fails for users who customized their install location.
-- **macOS: unsigned-app first-launch warning is gone after first install but DOES appear on the original install** ("PS5 Game Browser can't be opened because Apple cannot check it for malicious software" — user right-clicks → Open). After they trust it once, the auto-updater strips the quarantine xattr from replacement bundles so the warning doesn't recur. True code-signing ($99/yr Apple Developer Program) eliminates the first-launch prompt entirely.
+- **macOS: unsigned-app first-launch warning is gone after first install but DOES appear on the original install** ("PS4 Game Browser can't be opened because Apple cannot check it for malicious software" — user right-clicks → Open). After they trust it once, the auto-updater strips the quarantine xattr from replacement bundles so the warning doesn't recur. True code-signing ($99/yr Apple Developer Program) eliminates the first-launch prompt entirely.
 - **Pre-release tags ignored:** the GitHub API endpoint `/releases/latest` only returns published non-prerelease releases. To roll out gradually, mark releases as `prerelease: true` until you're ready.
 - **No rollback if updated version crashes on launch.** User has to manually download an older release. Could be mitigated by keeping a backup of the old exe before replacing, but not implemented.
 - **No update signature verification.** Anyone who can intercept GitHub's HTTPS connection AND has a valid github.com cert could theoretically push a malicious update. This is the trade-off vs the keypair-signed approach. In practice it requires breaking TLS or compromising GitHub itself — not a realistic threat for most apps. If you do need signature verification, switch to `tauri-plugin-updater` (see `SETUP_AUTOUPDATER.md` history in git, or generate a new one).
@@ -50,6 +50,6 @@ Running apps will pick this up automatically on their next launch.
 
 **Update prompt never appears:** open the app via PowerShell with `--debug` to see Rust errors, OR run `cargo tauri dev` locally to see the console. Most common cause: GitHub API rate-limit (60/hour for unauthed requests). Each app launch makes one API call.
 
-**Update downloads but doesn't install:** Check `%TEMP%\ps5-game-browser-update.bat` exists after the prompt. Run it manually to see error output. Most common: a security app (AV) is blocking the spawned cmd.
+**Update downloads but doesn't install:** Check `%TEMP%\ps4-game-browser-update.bat` exists after the prompt. Run it manually to see error output. Most common: a security app (AV) is blocking the spawned cmd.
 
 **Want to test without cutting a real release:** temporarily change the Rust constants `GH_OWNER`/`GH_REPO` in `main.rs` to a test repo, push a fake release there, observe behavior.

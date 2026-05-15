@@ -1,4 +1,4 @@
-name: Build PS5 Game Browser
+name: Build PS4 Game Browser
 
 on:
   push:
@@ -83,7 +83,7 @@ jobs:
               owner: context.repo.owner,
               repo:  context.repo.repo,
               tag_name: tag,
-              name:     `PS5 Game Browser ${tag}`,
+              name:     `PS4 Game Browser ${tag}`,
               draft:    true,
               prerelease: false,
               generate_release_notes: true,
@@ -189,29 +189,29 @@ jobs:
           }
 
           # Filenames include the tag for discoverability outside the app:
-          # users who download "PS5 Game Browser v4.0.0.exe" can tell at a
+          # users who download "PS4 Game Browser v4.0.0.exe" can tell at a
           # glance which version they have. The in-app updater matches by
           # file extension + arch substring, so it doesn't care about the
           # version part of the name.
           case "$LABEL" in
             windows)
               SRC=$(find "$BUNDLE_DIR" -type f -name '*setup.exe' | head -1)
-              upload "$SRC" "PS5 Game Browser $TAG.exe"
+              upload "$SRC" "PS4 Game Browser $TAG.exe"
               ;;
             mac-arm)
               SRC=$(find "$BUNDLE_DIR" -type f -name '*.dmg' | head -1)
-              upload "$SRC" "PS5 Game Browser ${TAG}_aarch64.dmg"
+              upload "$SRC" "PS4 Game Browser ${TAG}_aarch64.dmg"
               ;;
             mac-intel)
               SRC=$(find "$BUNDLE_DIR" -type f -name '*.dmg' | head -1)
-              upload "$SRC" "PS5 Game Browser ${TAG}_x64.dmg"
+              upload "$SRC" "PS4 Game Browser ${TAG}_x64.dmg"
               ;;
             linux)
               # Tauri's Linux build produces BOTH .AppImage and .deb
               APPIMAGE=$(find "$BUNDLE_DIR" -type f -name '*.AppImage' | head -1)
               DEB=$(find "$BUNDLE_DIR" -type f -name '*.deb' | head -1)
-              upload "$APPIMAGE" "PS5 Game Browser ${TAG}_amd64.AppImage" || true
-              upload "$DEB"      "PS5 Game Browser ${TAG}_amd64.deb"      || true
+              upload "$APPIMAGE" "PS4 Game Browser ${TAG}_amd64.AppImage" || true
+              upload "$DEB"      "PS4 Game Browser ${TAG}_amd64.deb"      || true
               ;;
             *)
               echo "::error::unknown label: $LABEL"

@@ -1,4 +1,4 @@
-// PS5 Game Browser — Tauri 2 backend (production)
+// PS4 Game Browser — Tauri 2 backend (production)
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use serde::{Deserialize, Serialize};
@@ -7,7 +7,7 @@ use std::process::Command;
 use tauri::Manager;   // for app.get_webview_window() in single-instance callback
 
 const GH_OWNER: &str = "NookieAI";
-const GH_REPO:  &str = "PS5-Game-Scraper";
+const GH_REPO:  &str = "PS4-Game-Browser";
 
 // ── GitHub API types ─────────────────────────────────────────────────────────
 // Only the fields we actually use are deserialized — serde silently ignores
@@ -105,7 +105,7 @@ async fn install_update(download_url: String,
     // Download the installer to a temp file. 5min timeout covers slow
     // connections without freezing forever on a stalled download.
     let client = reqwest::Client::builder()
-        .user_agent("PS5GameBrowser-Updater/1.0")
+        .user_agent("PS4GameBrowser-Updater/1.0")
         .timeout(std::time::Duration::from_secs(300))
         .build()
         .map_err(|e| format!("client init: {e}"))?;
@@ -120,12 +120,12 @@ async fn install_update(download_url: String,
         .await
         .map_err(|e| format!("download body: {e}"))?;
 
-    // Prefer the API-supplied filename (preserves spaces in "PS5 Game Browser.exe"
+    // Prefer the API-supplied filename (preserves spaces in "PS4 Game Browser.exe"
     // etc). Fall back to URL basename with %20 decoded if not provided.
     let safe_name = asset_name.unwrap_or_else(|| {
         download_url.rsplit('/')
             .next()
-            .unwrap_or("ps5-game-browser-update.bin")
+            .unwrap_or("ps4-game-browser-update.bin")
             .replace("%20", " ")
     });
 
@@ -152,7 +152,7 @@ async fn fetch_latest_release() -> Result<GithubRelease, String> {
     // 10s timeout for the API check — if GitHub is down or rate-limiting,
     // fail fast rather than blocking app startup behind a hung TCP connection.
     let client = reqwest::Client::builder()
-        .user_agent("PS5GameBrowser-Updater/1.0")
+        .user_agent("PS4GameBrowser-Updater/1.0")
         .timeout(std::time::Duration::from_secs(10))
         .build()
         .map_err(|e| e.to_string())?;
@@ -188,7 +188,7 @@ fn find_asset_for_platform(assets: &[GithubAsset]) -> Option<&GithubAsset> {
     #[cfg(target_os = "windows")]
     {
         // Any .exe on the release — with the custom workflow naming
-        // ("PS5 Game Browser v4.0.0.exe") there's exactly one Windows asset.
+        // ("PS4 Game Browser v4.0.0.exe") there's exactly one Windows asset.
         return assets.iter().find(|a| a.name.to_lowercase().ends_with(".exe"));
     }
     #[cfg(target_os = "macos")]
@@ -231,7 +231,7 @@ fn spawn_updater(downloaded: &PathBuf, current_exe: &PathBuf, pid: u32)
     const CREATE_NO_WINDOW:          u32 = 0x08000000;
 
     let script_path = std::env::temp_dir()
-        .join("ps5-game-browser-update.bat");
+        .join("ps4-game-browser-update.bat");
 
     // NSIS silent install (/S). Installer overwrites current install location,
     // then we relaunch the newly-written exe. Wait-for-parent-exit loop is
@@ -278,7 +278,7 @@ fn spawn_updater(downloaded: &PathBuf, current_exe: &PathBuf, pid: u32)
     -> Result<(), std::io::Error>
 {
     use std::os::unix::fs::PermissionsExt;
-    let script_path = std::env::temp_dir().join("ps5-game-browser-update.sh");
+    let script_path = std::env::temp_dir().join("ps4-game-browser-update.sh");
 
     let is_deb = downloaded
         .extension()
@@ -333,17 +333,17 @@ case "$DATA_TAR" in
 esac
 
 # Locate the binary inside the extracted .deb tree. Three-tier strategy:
-#   1. Tauri's standard install path (current): usr/bin/ps5-game-browser
-#   2. Any ELF executable whose name contains ps5/game/browser fragments
-#      (covers future Tauri layout changes like opt/PS5 Game Browser/)
+#   1. Tauri's standard install path (current): usr/bin/ps4-game-browser
+#   2. Any ELF executable whose name contains ps4/game/browser fragments
+#      (covers future Tauri layout changes like opt/PS4 Game Browser/)
 #   3. Any ELF executable, last resort
-NEW_BIN="$(find . -type f -name 'ps5-game-browser' | head -1)"
+NEW_BIN="$(find . -type f -name 'ps4-game-browser' | head -1)"
 
 if [ -z "$NEW_BIN" ] && command -v file >/dev/null 2>&1; then
     while IFS= read -r candidate; do
         if file -b "$candidate" 2>/dev/null | grep -q 'ELF.*executable'; then
             case "$(basename "$candidate" | tr '[:upper:]' '[:lower:]')" in
-                *ps5*|*browser*|*game*)
+                *ps4*|*browser*|*game*)
                     NEW_BIN="$candidate"
                     break
                     ;;
@@ -422,8 +422,8 @@ fn spawn_updater(downloaded: &PathBuf, current_exe: &PathBuf, pid: u32)
                 .unwrap_or_else(|| current_exe.clone())
         });
 
-    let script_path = std::env::temp_dir().join("ps5-game-browser-update.sh");
-    let mount_point = std::env::temp_dir().join("ps5-browser-update-mount");
+    let script_path = std::env::temp_dir().join("ps4-game-browser-update.sh");
+    let mount_point = std::env::temp_dir().join("ps4-browser-update-mount");
 
     // Flow:
     //   1. hdiutil attach the .dmg silently.
@@ -473,7 +473,7 @@ if [ "$DIRECT_OK" -eq 0 ]; then
     # as root inside osascript's privileged context, so /Applications writes
     # succeed even under MDM/parental restrictions.
     ELEVATED_SCRIPT="rm -rf '{app_bundle}' && ditto '$NEW_APP' '{app_bundle}' && xattr -dr com.apple.quarantine '{app_bundle}'"
-    if ! osascript -e "do shell script \"$ELEVATED_SCRIPT\" with administrator privileges with prompt \"PS5 Game Browser needs permission to install the update.\"" >/dev/null 2>&1; then
+    if ! osascript -e "do shell script \"$ELEVATED_SCRIPT\" with administrator privileges with prompt \"PS4 Game Browser needs permission to install the update.\"" >/dev/null 2>&1; then
         # User canceled the password dialog OR ditto failed even with root.
         hdiutil detach "{mount}" -quiet || true
         rm -rf "{mount}" "{downloaded}"
@@ -526,5 +526,5 @@ fn main() {
             install_update,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running PS5 Game Browser");
+        .expect("error while running PS4 Game Browser");
 }

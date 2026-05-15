@@ -1,4 +1,4 @@
-# PS5 Game Browser — Tauri Build Instructions
+# PS4 Game Browser — Tauri Build Instructions
 
 ## Prerequisites (one-time setup)
 
@@ -30,7 +30,7 @@ a schema error otherwise.
 ## Project structure
 
 ```
-ps5-game-browser/
+ps4-game-browser/
 ├── index.html              ← frontend (edit this for UI changes)
 ├── BUILD.md                ← this file
 └── src-tauri/
@@ -79,8 +79,8 @@ cargo tauri build
 ```
 
 Output: `src-tauri/target/release/bundle/`
-- **NSIS installer:** `nsis/PS5 Game Browser_1.0.0_x64-setup.exe`
-- **Raw portable exe:** `src-tauri/target/release/ps5-game-browser.exe`
+- **NSIS installer:** `nsis/PS4 Game Browser_1.0.0_x64-setup.exe`
+- **Raw portable exe:** `src-tauri/target/release/ps4-game-browser.exe`
 
 The raw `.exe` is fully portable — copy it anywhere and run it.
 WebView2 must be installed on the target machine (pre-installed on Win10/11).
@@ -95,7 +95,7 @@ WebView2 must be installed on the target machine (pre-installed on Win10/11).
 | UI (index.html)    | Inside the exe     | Rebuild                    |
 | `ui_patch.css`     | R2 CDN             | Upload file, instant        |
 | `ui_patch.js`      | R2 CDN             | Upload file, instant        |
-| `games_ps5_cache.json` | R2 CDN         | Upload file, instant        |
+| `games_cache.json` | R2 CDN         | Upload file, instant        |
 | Game images        | R2 CDN             | Already there from scraper  |
 
 ---
@@ -103,14 +103,14 @@ WebView2 must be installed on the target machine (pre-installed on Win10/11).
 ## R2 bucket layout
 
 ```
-ps5/                               ← bucket root
-├── games_ps5_cache.json           ← data (required)
+ps4/                               ← bucket root
+├── games_cache.json           ← data (required)
 ├── ui_patch.css                   ← remote CSS patch (optional, upload empty file to disable)
 ├── ui_patch.js                    ← remote JS patch  (optional, upload empty file to disable)
-├── PPSA04609-elden-ring-ps5/
-│   ├── cover_PPSA04609.jpg
-│   ├── screenshot_1_PPSA04609.jpg
-│   └── screenshot_2_PPSA04609.jpg
+├── CUSA04609-elden-ring-ps4/
+│   ├── cover_CUSA04609.jpg
+│   ├── screenshot_1_CUSA04609.jpg
+│   └── screenshot_2_CUSA04609.jpg
 └── ... (one folder per game, created by scraper)
 ```
 

@@ -1,5 +1,5 @@
 [package]
-name    = "ps5-game-browser"
+name    = "ps4-game-browser"
 version = "4.0.0"
 edition = "2021"
 
