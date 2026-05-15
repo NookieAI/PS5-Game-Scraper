@@ -1,7 +1,7 @@
 <div align="center">
+<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/efaa4494-7061-49c8-9596-362bb55b2d43" />
 
-# 🎮 PS5 Game B![Uploading image.png…]()
-rowser
+# 🎮 PS5 Game Browser
 
 **Browse, search, and download from a huge PS5 game library — all from one clean desktop app.**
 
