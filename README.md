@@ -1,12 +1,12 @@
 <div align="center">
-<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/b0f448e9-e1eb-4aea-9525-c9d2cf0a0617" />
+<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/f01164c9-1d13-4a95-95dd-aa7cbd1b86f8" />
 
 # 🎮 PS5 Game Browser
 
-**Browse, search, and download from a huge PS5 game library — all from one clean desktop app.**
+**Browse, search, and download from a huge PS4 game library — all from one clean desktop app.**
 
-[![Latest Release](https://img.shields.io/github/v/release/NookieAI/PS5-Game-Scraper?label=latest&color=00d4ff&style=for-the-badge)](https://github.com/NookieAI/PS5-Game-Scraper/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/NookieAI/PS5-Game-Scraper/total?color=00d4ff&style=for-the-badge)](https://github.com/NookieAI/PS5-Game-Scraper/releases)
+[![Latest Release](https://img.shields.io/github/v/release/NookieAI/PS4-Game-Scraper?label=latest&color=00d4ff&style=for-the-badge)](https://github.com/NookieAI/PS4-Game-Scraper/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/NookieAI/PS4-Game-Scraper/total?color=00d4ff&style=for-the-badge)](https://github.com/NookieAI/PS4-Game-Scraper/releases)
 [![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-00d4ff?style=for-the-badge)](#-install)
 
 </div>
@@ -15,14 +15,14 @@
 
 ## ⬇️ Download
 
-Grab the right file for your computer from the **[Latest Release](https://github.com/NookieAI/PS5-Game-Scraper/releases/latest)** page:
+Grab the right file for your computer from the **[Latest Release](https://github.com/NookieAI/PS4-Game-Scraper/releases/latest)** page:
 
 | Your computer | Download |
 |---|---|
-| 🪟 **Windows 10/11** | `PS5 Game Browser v*.exe` — *portable, just double-click* |
-| 🍎 **Mac (Apple Silicon — M1/M2/M3/M4)** | `PS5 Game Browser v*_aarch64.app.zip` |
-| 🍎 **Mac (Intel)** | `PS5 Game Browser v*_x64.app.zip` |
-| 🐧 **Linux (any)** | `PS5 Game Browser v*_amd64.AppImage` — *portable, just chmod +x* |
+| 🪟 **Windows 10/11** | `PS4 Game Browser v*.exe` — *portable, just double-click* |
+| 🍎 **Mac (Apple Silicon — M1/M2/M3/M4)** | `PS4 Game Browser v*_aarch64.app.zip` |
+| 🍎 **Mac (Intel)** | `PS4 Game Browser v*_x64.app.zip` |
+| 🐧 **Linux (any)** | `PS4 Game Browser v*_amd64.AppImage` — *portable, just chmod +x* |
 
 *Not sure which Mac you have? Click the Apple menu → About This Mac. If it says "Chip: Apple M1/M2/M3/M4", get the Apple Silicon one. If it says "Processor: Intel", get the Intel one.*
 
@@ -44,7 +44,7 @@ Grab the right file for your computer from the **[Latest Release](https://github
 
 ### 🪟 Windows
 
-1. Download `PS5 Game Browser v*.exe` from the [releases page](https://github.com/NookieAI/PS5-Game-Scraper/releases/latest).
+1. Download `PS4 Game Browser v*.exe` from the [releases page](https://github.com/NookieAI/PS4-Game-Scraper/releases/latest).
 2. Put it anywhere you like — Desktop, Downloads, a folder on your D: drive, even a USB stick. **No installer.**
 3. Double-click to run.
 4. **Windows will probably show a blue "Windows protected your PC" screen** — this happens to every small app that doesn't pay Microsoft for a code-signing certificate. Click **More info**, then **Run anyway**.
@@ -53,18 +53,18 @@ Grab the right file for your computer from the **[Latest Release](https://github
 ### 🍎 Mac
 
 1. Download the `.app.zip` file that matches your Mac (see the table above).
-2. Double-click the `.zip` to unzip — you'll get **PS5 Game Browser.app**.
+2. Double-click the `.zip` to unzip — you'll get **PS4 Game Browser.app**.
 3. Put it anywhere you want — Applications, Desktop, an external drive. Then double-click to open.
-4. The first time you open it: macOS will refuse and say *"PS5 Game Browser can't be opened because Apple cannot check it for malicious software."* This is normal for apps not sold through the App Store.
+4. The first time you open it: macOS will refuse and say *"PS4 Game Browser can't be opened because Apple cannot check it for malicious software."* This is normal for apps not sold through the App Store.
    - **Right-click** (or Control-click) the app → choose **Open** → click **Open** on the warning dialog.
    - You only have to do this once. After that, double-click works normally.
 5. Future updates install automatically without re-prompting.
 
 ### 🐧 Linux
 
-1. Download `PS5 Game Browser v*_amd64.AppImage`.
+1. Download `PS4 Game Browser v*_amd64.AppImage`.
 2. Right-click it → Properties → make it executable.  
-   *(Or in a terminal: `chmod +x "PS5 Game Browser"*.AppImage`)*
+   *(Or in a terminal: `chmod +x "PS4 Game Browser"*.AppImage`)*
 3. Double-click to run. Put it wherever you like — it's a single file with no install step.
 
 ---
@@ -133,7 +133,7 @@ A few things to check:
 - Make sure your computer can reach `github.com` (corporate firewalls sometimes block it).
 - Close and reopen the app — the check runs 8 seconds after startup.
 - If you've been opening and closing the app dozens of times within an hour, GitHub may have rate-limited your IP for an hour. Wait and try again.
-- If you click **OK** on the update but nothing happens, your antivirus may be blocking the installer. Temporarily disable it and try again, or download manually from the [releases page](https://github.com/NookieAI/PS5-Game-Scraper/releases/latest).
+- If you click **OK** on the update but nothing happens, your antivirus may be blocking the installer. Temporarily disable it and try again, or download manually from the [releases page](https://github.com/NookieAI/PS4-Game-Scraper/releases/latest).
 </details>
 
 <details>
@@ -166,17 +166,17 @@ Don't mix parts from different hosts.
 Easy — there's no installer to uninstall. The app is fully portable on every platform:
 
 - **Windows:** delete the .exe file.
-- **Mac:** drag PS5 Game Browser.app to the Trash.
+- **Mac:** drag PS4 Game Browser.app to the Trash.
 - **Linux:** delete the .AppImage file.
 
-If you want to clear remembered settings too: delete the small config file the app stores in your user data folder (`%APPDATA%\com.nookie.ps5browser\` on Windows, `~/Library/Application Support/com.nookie.ps5browser/` on Mac, `~/.local/share/com.nookie.ps5browser/` on Linux).
+If you want to clear remembered settings too: delete the small config file the app stores in your user data folder (`%APPDATA%\com.nookie.ps4browser\` on Windows, `~/Library/Application Support/com.nookie.ps4browser/` on Mac, `~/.local/share/com.nookie.ps4browser/` on Linux).
 </details>
 
 ---
 
 ## 💬 Found a bug? Have a request?
 
-Open an [Issue](https://github.com/NookieAI/PS5-Game-Scraper/issues) and describe what happened. Screenshots help a lot.
+Open an [Issue](https://github.com/NookieAI/PS4-Game-Scraper/issues) and describe what happened. Screenshots help a lot.
 
 ---
 
