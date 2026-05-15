@@ -10,14 +10,16 @@ const GH_OWNER: &str = "NookieAI";
 const GH_REPO:  &str = "PS5-Game-Scraper";
 
 // ── GitHub API types ─────────────────────────────────────────────────────────
+// Only the fields we actually use are deserialized — serde silently ignores
+// every other field in the JSON response (release name, prerelease flag,
+// author, etc). The `/releases/latest` endpoint already excludes prereleases
+// server-side, so we don't need a local bool check.
 #[derive(Deserialize)]
 struct GithubRelease {
-    tag_name:    String,
-    name:        Option<String>,
-    body:        Option<String>,
-    assets:      Vec<GithubAsset>,
-    html_url:    String,
-    prerelease:  bool,
+    tag_name: String,
+    body:     Option<String>,
+    assets:   Vec<GithubAsset>,
+    html_url: String,
 }
 
 #[derive(Deserialize)]
@@ -51,9 +53,12 @@ async fn check_for_updates() -> Result<UpdateInfo, String> {
     let release = fetch_latest_release().await
         .map_err(|e| format!("Update check failed: {e}"))?;
 
-    let latest = release.tag_name.trim_start_matches('v').to_string();
-    let release_url = Some(release.html_url.clone());
-    let notes = release.body.clone();
+    // Destructure so we can move fields out without cloning. Each return
+    // branch below consumes `release_url` and `notes` exactly once.
+    let GithubRelease { tag_name, body, assets, html_url } = release;
+    let latest      = tag_name.trim_start_matches('v').to_string();
+    let release_url = Some(html_url);
+    let notes       = body;
 
     if !is_newer(&latest, &current) {
         return Ok(UpdateInfo {
@@ -63,7 +68,7 @@ async fn check_for_updates() -> Result<UpdateInfo, String> {
         });
     }
 
-    match find_asset_for_platform(&release.assets) {
+    match find_asset_for_platform(&assets) {
         Some(asset) => Ok(UpdateInfo {
             available:    true,
             current,
@@ -75,28 +80,33 @@ async fn check_for_updates() -> Result<UpdateInfo, String> {
             notes,
             error:        None,
         }),
-        None => Ok(UpdateInfo {
-            available:    true,
-            current,
-            latest:       Some(latest.clone()),
-            download_url: None,
-            asset_name:   None,
-            asset_size:   None,
-            release_url,
-            notes,
-            error:        Some(format!(
+        None => {
+            let err_msg = format!(
                 "v{latest} is available but no installer for this platform was found on the release."
-            )),
-        }),
+            );
+            Ok(UpdateInfo {
+                available:    true,
+                current,
+                latest:       Some(latest.clone()),
+                download_url: None,
+                asset_name:   None,
+                asset_size:   None,
+                release_url,
+                notes,
+                error:        Some(err_msg),
+            })
+        }
     }
 }
 
 #[tauri::command]
 async fn install_update(download_url: String,
                         asset_name:   Option<String>) -> Result<String, String> {
-    // Download the installer to a temp file
+    // Download the installer to a temp file. 5min timeout covers slow
+    // connections without freezing forever on a stalled download.
     let client = reqwest::Client::builder()
         .user_agent("PS5GameBrowser-Updater/1.0")
+        .timeout(std::time::Duration::from_secs(300))
         .build()
         .map_err(|e| format!("client init: {e}"))?;
 
@@ -139,8 +149,11 @@ async fn fetch_latest_release() -> Result<GithubRelease, String> {
     let url = format!(
         "https://api.github.com/repos/{GH_OWNER}/{GH_REPO}/releases/latest"
     );
+    // 10s timeout for the API check — if GitHub is down or rate-limiting,
+    // fail fast rather than blocking app startup behind a hung TCP connection.
     let client = reqwest::Client::builder()
         .user_agent("PS5GameBrowser-Updater/1.0")
+        .timeout(std::time::Duration::from_secs(10))
         .build()
         .map_err(|e| e.to_string())?;
     let resp = client.get(&url).send().await.map_err(|e| e.to_string())?;
@@ -174,40 +187,31 @@ fn is_newer(latest: &str, current: &str) -> bool {
 fn find_asset_for_platform(assets: &[GithubAsset]) -> Option<&GithubAsset> {
     #[cfg(target_os = "windows")]
     {
-        // Prefer the NSIS installer (x64-setup.exe) — handles file-replacement,
-        // start-menu shortcut, uninstaller. Falls back to any .exe asset.
-        if let Some(a) = assets.iter().find(|a|
-            a.name.to_lowercase().ends_with("x64-setup.exe")
-            || a.name.to_lowercase().contains("setup.exe")
-        ) {
-            return Some(a);
-        }
+        // Any .exe on the release — with the custom workflow naming
+        // ("PS5 Game Browser v4.0.0.exe") there's exactly one Windows asset.
         return assets.iter().find(|a| a.name.to_lowercase().ends_with(".exe"));
     }
     #[cfg(target_os = "macos")]
     {
-        // .dmg for Intel/ARM. Architecture detection: at runtime
-        // std::env::consts::ARCH is "aarch64" on M1, "x86_64" on Intel.
+        // .app inside .zip — fully portable, no install step.
+        // std::env::consts::ARCH is "aarch64" on Apple Silicon, "x86_64" on Intel.
         let arch = std::env::consts::ARCH;
         if arch == "aarch64" {
             if let Some(a) = assets.iter().find(|a|
                 a.name.to_lowercase().contains("aarch64")
-                && a.name.to_lowercase().ends_with(".dmg")
+                && a.name.to_lowercase().ends_with(".app.zip")
             ) { return Some(a); }
         }
         return assets.iter().find(|a|
-            a.name.to_lowercase().ends_with(".dmg")
+            a.name.to_lowercase().ends_with(".app.zip")
             && !a.name.to_lowercase().contains("aarch64")
         );
     }
     #[cfg(target_os = "linux")]
     {
-        // Prefer AppImage (self-contained, easy to swap). Fall back to .deb.
-        if let Some(a) = assets.iter().find(|a|
-            a.name.to_lowercase().ends_with(".appimage")
-        ) { return Some(a); }
+        // AppImage only — self-contained portable, no system install.
         return assets.iter().find(|a|
-            a.name.to_lowercase().ends_with(".deb")
+            a.name.to_lowercase().ends_with(".appimage")
         );
     }
     #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
@@ -226,19 +230,25 @@ fn spawn_updater(downloaded: &PathBuf, current_exe: &PathBuf, pid: u32)
     let script_path = std::env::temp_dir()
         .join("ps5-game-browser-update.bat");
 
-    // NSIS silent install (/S). Installer overwrites current install location,
-    // then we relaunch the newly-written exe.
+    // Portable file-swap: download is the raw .exe, not an installer.
+    // We delete the old exe and rename the downloaded one in its place.
+    // Wait-for-parent-exit loop is capped at ~30s to avoid infinite spin
+    // if the OS leaves a zombie process.
     let script = format!(
         r#"@echo off
+set /a wait_count=0
 :waitloop
 tasklist /FI "PID eq {pid}" 2>NUL | findstr /I /C:"{pid}" >NUL
-if not errorlevel 1 (
-    timeout /t 1 /nobreak >nul
-    goto waitloop
-)
+if errorlevel 1 goto proceed
+set /a wait_count+=1
+if %wait_count% GEQ 30 goto proceed
 timeout /t 1 /nobreak >nul
-"{downloaded}" /S
-timeout /t 3 /nobreak >nul
+goto waitloop
+:proceed
+timeout /t 2 /nobreak >nul
+del /F /Q "{current_exe}"
+move /Y "{downloaded}" "{current_exe}"
+timeout /t 1 /nobreak >nul
 start "" "{current_exe}"
 del "%~f0"
 "#,
@@ -248,8 +258,15 @@ del "%~f0"
     );
     std::fs::write(&script_path, script)?;
 
+    let script_str = script_path.to_str().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "updater script path is not valid UTF-8",
+        )
+    })?;
+
     Command::new("cmd")
-        .args(&["/C", script_path.to_str().unwrap_or("")])
+        .args(["/C", script_str])
         .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW)
         .spawn()?;
     Ok(())
@@ -405,39 +422,44 @@ fn spawn_updater(downloaded: &PathBuf, current_exe: &PathBuf, pid: u32)
         });
 
     let script_path = std::env::temp_dir().join("ps5-game-browser-update.sh");
-    let mount_point = std::env::temp_dir().join("ps5-browser-update-mount");
+    let unzip_dir   = std::env::temp_dir().join("ps5-browser-update-extract");
 
-    // Flow:
-    //   1. hdiutil attach the .dmg silently.
-    //   2. Find the .app inside the mounted volume.
-    //   3. Attempt `ditto` direct replace (no elevation).
-    //   4. If ditto fails with permission errors (e.g. /Applications under
-    //      parental controls, MDM-managed Mac, or a Gatekeeper-locked path),
-    //      retry the replace via `osascript with administrator privileges`
-    //      which surfaces a native Touch ID / password dialog with a custom
-    //      prompt naming our app.
-    //   5. Strip Gatekeeper quarantine xattr so first launch is silent.
-    //   6. Detach, relaunch.
+    // Flow (portable .app.zip variant):
+    //   1. Wait for parent to exit.
+    //   2. Extract the .app.zip with `ditto -xk` (Apple-aware unzip — preserves
+    //      extended attributes, code signatures if present, resource forks).
+    //   3. Find the .app inside the extracted directory.
+    //   4. Attempt `ditto` direct replace of the current .app (no elevation).
+    //   5. If direct replace fails (e.g. /Applications under parental controls,
+    //      MDM-managed Mac, or a Gatekeeper-locked path), retry via osascript
+    //      with administrator privileges (native Touch ID / password prompt).
+    //   6. Strip Gatekeeper quarantine xattr so relaunch doesn't re-prompt.
+    //   7. Relaunch + clean up.
     let script = format!(
         r#"#!/bin/bash
 set -e
 while kill -0 {pid} 2>/dev/null; do sleep 0.5; done
 sleep 1
 
-mkdir -p "{mount}"
-hdiutil attach "{downloaded}" -mountpoint "{mount}" -nobrowse -quiet
+# Defensive cleanup: previous interrupted update may have left a stale extract
+# directory. Remove and recreate before extracting.
+rm -rf "{unzip}"
+mkdir -p "{unzip}"
 
-NEW_APP="$(find "{mount}" -maxdepth 2 -name '*.app' -type d | head -1)"
+# ditto -xk: extract a .zip preserving HFS+ metadata. Safer than `unzip` for
+# .app bundles since it keeps quarantine xattrs, code signatures, etc.
+ditto -xk "{downloaded}" "{unzip}"
+
+NEW_APP="$(find "{unzip}" -maxdepth 3 -name '*.app' -type d | head -1)"
 if [ -z "$NEW_APP" ]; then
-    hdiutil detach "{mount}" -quiet || true
-    rm -rf "{mount}" "{downloaded}"
-    osascript -e 'display alert "Update failed: no .app found inside DMG."' >/dev/null 2>&1 || true
+    rm -rf "{unzip}" "{downloaded}"
+    osascript -e 'display alert "Update failed: no .app found inside the downloaded zip."' >/dev/null 2>&1 || true
     rm -f "$0"
     exit 1
 fi
 
-# Try direct replace first (no password prompt). This works for the common
-# case: app in ~/Applications, or /Applications when the user owns the dir.
+# Try direct replace first (no password prompt). Works for: app in
+# ~/Applications, or /Applications when the user owns the dir.
 DIRECT_OK=0
 if rm -rf "{app_bundle}" 2>/dev/null && \
    ditto "$NEW_APP" "{app_bundle}" 2>/dev/null; then
@@ -445,34 +467,26 @@ if rm -rf "{app_bundle}" 2>/dev/null && \
 fi
 
 if [ "$DIRECT_OK" -eq 0 ]; then
-    # Elevation path: ask the user for admin via a native Touch ID / password
-    # dialog with a custom prompt that names the app. The shell command runs
-    # as root inside osascript's privileged context, so /Applications writes
-    # succeed even under MDM/parental restrictions.
+    # Elevation path: native Touch ID / password dialog naming our app.
     ELEVATED_SCRIPT="rm -rf '{app_bundle}' && ditto '$NEW_APP' '{app_bundle}' && xattr -dr com.apple.quarantine '{app_bundle}'"
     if ! osascript -e "do shell script \"$ELEVATED_SCRIPT\" with administrator privileges with prompt \"PS5 Game Browser needs permission to install the update.\"" >/dev/null 2>&1; then
-        # User canceled the password dialog OR ditto failed even with root.
-        hdiutil detach "{mount}" -quiet || true
-        rm -rf "{mount}" "{downloaded}"
+        rm -rf "{unzip}" "{downloaded}"
         osascript -e 'display alert "Update was cancelled or could not complete. The previous version is still installed."' >/dev/null 2>&1 || true
         rm -f "$0"
         exit 1
     fi
 else
-    # Direct path succeeded — strip quarantine ourselves so Gatekeeper doesn't
-    # re-prompt the user on relaunch.
     xattr -dr com.apple.quarantine "{app_bundle}" 2>/dev/null || true
 fi
 
-hdiutil detach "{mount}" -quiet || true
-rm -rf "{mount}" "{downloaded}"
+rm -rf "{unzip}" "{downloaded}"
 
 open "{app_bundle}"
 rm -f "$0"
 "#,
         pid        = pid,
         downloaded = downloaded.display(),
-        mount      = mount_point.display(),
+        unzip      = unzip_dir.display(),
         app_bundle = app_bundle.display(),
     );
     std::fs::write(&script_path, script)?;

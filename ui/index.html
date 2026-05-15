@@ -455,8 +455,8 @@
           modalLinks=document.getElementById('modalLinks');
 
     let allGames=[], filtered=[], currentGame=null;
-    let currentSort='title';
-    try { currentSort=localStorage.getItem('ps5SortBy')||'title'; } catch {}
+    let currentSort='date';
+    try { currentSort=localStorage.getItem('ps5SortBy')||'date'; } catch {}
 
     const setBtns=en=>{refreshBtn.disabled=!en;sortBtn.disabled=!en;};
     const showStatus=(m,ok=true)=>{statusEl.textContent=m;statusEl.style.color=ok?'#00ff88':'#ff3870';statusEl.classList.add('show');};
@@ -514,37 +514,52 @@
       // ── Silent auto-update check ──────────────────────────────────────────
       // Fires 8s after boot so the initial cache load runs first. Hits the
       // GitHub releases API via a Rust command (no signing, no plugin —
-      // just a version compare + installer download + spawn script). If a
-      // newer release is found, user gets a confirm dialog. Decline or any
-      // failure leaves the app running normally — updater never blocks.
+      // just a version compare + installer download + spawn script).
+      //
+      // Error policy:
+      //   • check_for_updates failure → silent (it's a background check)
+      //   • install_update failure   → loud (user clicked Yes, they need
+      //                                 to know what happened so they can
+      //                                 retry or download manually)
       setTimeout(async () => {
+        let info;
         try {
           const inv = window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.invoke;
           if (typeof inv !== 'function') return;
-          const info = await inv('check_for_updates');
-          if (!info || !info.available) return;
-          if (info.error) {
-            // Update exists but no compatible asset for this platform — point
-            // user to release page instead of auto-installing.
-            const go = confirm(`Update v${info.latest} available, but no automatic installer for this platform. Open release page?`);
-            if (go && info.release_url) openExternal(info.release_url);
-            return;
-          }
-          const sizeMb = info.asset_size ? ` (${(info.asset_size/1048576).toFixed(1)} MB)` : '';
-          const proceed = confirm(
-            `Update available: v${info.latest}${sizeMb}\n\n` +
-            `Currently running: v${info.current}\n\n` +
-            `Download and install now? The app will close and reopen automatically.`
-          );
-          if (!proceed) return;
-          showStatus(`Downloading v${info.latest}…`);
+          info = await inv('check_for_updates');
+        } catch (_) { return; /* silent — background check */ }
+        if (!info || !info.available) return;
+
+        if (info.error) {
+          const go = confirm(`Update v${info.latest} available, but no automatic installer for this platform. Open release page?`);
+          if (go && info.release_url) openExternal(info.release_url);
+          return;
+        }
+
+        const sizeMb = info.asset_size ? ` (${(info.asset_size/1048576).toFixed(1)} MB)` : '';
+        const proceed = confirm(
+          `Update available: v${info.latest}${sizeMb}\n\n` +
+          `Currently running: v${info.current}\n\n` +
+          `Download and install now? The app will close and reopen automatically.`
+        );
+        if (!proceed) return;
+
+        showStatus(`Downloading v${info.latest}, this may take a minute…`);
+        try {
+          const inv = window.__TAURI_INTERNALS__.invoke;
           await inv('install_update', {
             downloadUrl: info.download_url,
             assetName:   info.asset_name,
           });
-          showStatus(`Update downloaded — restarting…`);
-          setTimeout(() => { try { window.close(); } catch (_) {} }, 1500);
-        } catch (_) { /* silent — updater is best-effort */ }
+        } catch (e) {
+          // Download/install failed — surface it. Don't close the window;
+          // user can keep using v${current} and retry next launch.
+          const msg = (e && e.toString && e.toString()) || 'unknown error';
+          showStatus(`Update failed: ${msg}`, false);
+          return;
+        }
+        showStatus(`Update downloaded — restarting…`);
+        setTimeout(() => window.close(), 1500);
       }, 8000);
     });
 

@@ -23,6 +23,8 @@ jobs:
       release_id: ${{ steps.create.outputs.result }}
       tag:        ${{ steps.tag.outputs.value }}
     steps:
+      - uses: actions/checkout@v4
+
       - name: Determine version tag
         id: tag
         shell: bash
@@ -32,6 +34,30 @@ jobs:
           else
             echo "value=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Verify versions are consistent across all sources
+        shell: bash
+        env:
+          TAG: ${{ steps.tag.outputs.value }}
+        run: |
+          set -euo pipefail
+          CARGO_VERSION=$(grep -m1 '^version' src-tauri/Cargo.toml | cut -d'"' -f2)
+          CONF_VERSION=$(grep -m1 '"version"' src-tauri/tauri.conf.json | cut -d'"' -f4)
+          EXPECTED_TAG="v$CARGO_VERSION"
+
+          if [ "$CARGO_VERSION" != "$CONF_VERSION" ]; then
+            echo "::error::Cargo.toml ($CARGO_VERSION) and tauri.conf.json ($CONF_VERSION) disagree."
+            echo "::error::Fix: edit both files to the same version, commit, retag, re-push."
+            exit 1
+          fi
+
+          if [ "$TAG" != "$EXPECTED_TAG" ]; then
+            echo "::error::Tag $TAG doesn't match the source version (Cargo.toml=$CARGO_VERSION)."
+            echo "::error::Fix: bump Cargo.toml + tauri.conf.json to match the tag (or retag to v$CARGO_VERSION)."
+            exit 1
+          fi
+
+          echo "✓ Cargo.toml = tauri.conf.json = $CARGO_VERSION = $TAG"
 
       - name: Create or reuse draft release
         id: create
@@ -76,12 +102,12 @@ jobs:
             label:    windows
             target:   x86_64-pc-windows-msvc
             args:     ''
-          - platform: macos-14            # Apple Silicon
+          - platform: macos-14            # Apple Silicon — builds ARM natively
             label:    mac-arm
             target:   aarch64-apple-darwin
             args:     '--target aarch64-apple-darwin'
-          - platform: macos-14            # Intel
-            label:    mac-intel
+          - platform: macos-14            # Apple Silicon — cross-compiles to Intel
+            label:    mac-intel           # macos-13 is deprecated; macos-14 cross-builds x86_64 fine
             target:   x86_64-apple-darwin
             args:     '--target x86_64-apple-darwin'
           - platform: ubuntu-22.04
@@ -97,6 +123,18 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+
+      # On macos-14 the dtolnay action occasionally installs the toolchain
+      # without setting it as the rustup default — leaving `cargo` as a
+      # rustup-init shim that fails with "unexpected argument 'metadata' found".
+      # Setting the default explicitly fixes it; the version print verifies.
+      - name: Set rustup default + verify
+        shell: bash
+        run: |
+          rustup default stable
+          rustup show
+          cargo --version
+          rustc --version
 
       - name: Install Linux dependencies (Tauri v2)
         if: matrix.platform == 'ubuntu-22.04'
@@ -123,7 +161,6 @@ jobs:
       # src-tauri/target/<...>/release/bundle/. We rename + upload them ourselves
       # in the next step using the user's preferred naming scheme.
       - name: Build with tauri-action
-        id: tauri
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -142,17 +179,26 @@ jobs:
           set -euo pipefail
           # `find` is authoritative — tauri-action's artifactPaths is sometimes
           # incomplete (drops sub-bundles).
-          BUNDLE_DIR=$(find src-tauri/target -type d -path '*/release/bundle' | head -1)
-          if [ -z "$BUNDLE_DIR" ] || [ ! -d "$BUNDLE_DIR" ]; then
-            echo "::error::no bundle directory found under src-tauri/target"
-            exit 1
+          #
+          # PORTABLE OUTPUTS:
+          #   Windows: src-tauri/target/release/<binary>.exe  (raw exe — built by cargo)
+          #   macOS:   src-tauri/target/<arch>/release/bundle/macos/<Product>.app  (we zip it)
+          #   Linux:   src-tauri/target/release/bundle/appimage/<binary>_<ver>_amd64.AppImage
+          #
+          # Bundle dir only relevant for macOS and Linux. Windows builds no bundle.
+          if [ "$LABEL" != "windows" ]; then
+            BUNDLE_DIR=$(find src-tauri/target -type d -path '*/release/bundle' | head -1)
+            if [ -z "$BUNDLE_DIR" ] || [ ! -d "$BUNDLE_DIR" ]; then
+              echo "::error::no bundle directory found under src-tauri/target"
+              exit 1
+            fi
+            echo "Bundle directory: $BUNDLE_DIR"
+            find "$BUNDLE_DIR" -type f -o -type d -name '*.app' | sort
           fi
-          echo "Bundle directory: $BUNDLE_DIR"
-          find "$BUNDLE_DIR" -type f | sort
 
           upload() {
             local SRC="$1"; local NEW_NAME="$2"
-            if [ -z "$SRC" ] || [ ! -f "$SRC" ]; then
+            if [ -z "$SRC" ] || [ ! -e "$SRC" ]; then
               echo "  skip (not found): $NEW_NAME"
               return 1
             fi
@@ -170,23 +216,39 @@ jobs:
           # version part of the name.
           case "$LABEL" in
             windows)
-              SRC=$(find "$BUNDLE_DIR" -type f -name '*setup.exe' | head -1)
+              # Raw portable exe — Tauri 2 always builds this at target/release/<binary>.exe
+              # regardless of bundle.targets. Drop NSIS entirely.
+              SRC=$(find src-tauri/target/release -maxdepth 1 -name 'ps5-game-browser.exe' -type f | head -1)
               upload "$SRC" "PS5 Game Browser $TAG.exe"
               ;;
             mac-arm)
-              SRC=$(find "$BUNDLE_DIR" -type f -name '*.dmg' | head -1)
-              upload "$SRC" "PS5 Game Browser ${TAG}_aarch64.dmg"
+              # Zip the .app bundle. `ditto -ck --sequesterRsrc --keepParent`
+              # is the macOS-native way to zip preserving HFS+ metadata and
+              # the .app top-level directory (so unzip recreates "PS5 Game Browser.app").
+              APP=$(find "$BUNDLE_DIR/macos" -maxdepth 1 -name '*.app' -type d | head -1)
+              if [ -n "$APP" ]; then
+                ZIP_PATH="$BUNDLE_DIR/macos/PS5 Game Browser ${TAG}_aarch64.app.zip"
+                (cd "$(dirname "$APP")" && ditto -ck --sequesterRsrc --keepParent "$(basename "$APP")" "$ZIP_PATH")
+                upload "$ZIP_PATH" "PS5 Game Browser ${TAG}_aarch64.app.zip"
+              else
+                echo "::error::no .app found at $BUNDLE_DIR/macos"
+                exit 1
+              fi
               ;;
             mac-intel)
-              SRC=$(find "$BUNDLE_DIR" -type f -name '*.dmg' | head -1)
-              upload "$SRC" "PS5 Game Browser ${TAG}_x64.dmg"
+              APP=$(find "$BUNDLE_DIR/macos" -maxdepth 1 -name '*.app' -type d | head -1)
+              if [ -n "$APP" ]; then
+                ZIP_PATH="$BUNDLE_DIR/macos/PS5 Game Browser ${TAG}_x64.app.zip"
+                (cd "$(dirname "$APP")" && ditto -ck --sequesterRsrc --keepParent "$(basename "$APP")" "$ZIP_PATH")
+                upload "$ZIP_PATH" "PS5 Game Browser ${TAG}_x64.app.zip"
+              else
+                echo "::error::no .app found at $BUNDLE_DIR/macos"
+                exit 1
+              fi
               ;;
             linux)
-              # Tauri's Linux build produces BOTH .AppImage and .deb
               APPIMAGE=$(find "$BUNDLE_DIR" -type f -name '*.AppImage' | head -1)
-              DEB=$(find "$BUNDLE_DIR" -type f -name '*.deb' | head -1)
-              upload "$APPIMAGE" "PS5 Game Browser ${TAG}_amd64.AppImage" || true
-              upload "$DEB"      "PS5 Game Browser ${TAG}_amd64.deb"      || true
+              upload "$APPIMAGE" "PS5 Game Browser ${TAG}_amd64.AppImage"
               ;;
             *)
               echo "::error::unknown label: $LABEL"

@@ -17,6 +17,7 @@
         "minHeight": 600,
         "resizable": true,
         "fullscreen": false,
+        "maximized": true,
         "center": true,
         "decorations": true,
         "dragDropEnabled": false
@@ -29,7 +30,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["app", "appimage"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -37,11 +38,6 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "windows": {
-      "nsis": {
-        "installMode": "currentUser"
-      }
-    },
     "resources": []
   }
 }
