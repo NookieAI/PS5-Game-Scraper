@@ -19,6 +19,13 @@
     .search-clear { position: absolute; top: 50%; right: 8px; transform: translateY(-50%); width: 20px; height: 20px; padding: 0; border: 0; background: transparent; color: #777; cursor: pointer; font-size: 18px; line-height: 20px; text-align: center; font-weight: normal; display: none; transition: color 0.15s; min-width: 0; }
     .search-clear:hover { background: transparent; color: #fff; }
     .search-wrap.has-text .search-clear { display: block; }
+    .filter-row { display: flex; gap: 6px; margin: 10px 8px 0 8px; flex-wrap: wrap; align-items: center; }
+    .filter-label { color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 4px; }
+    .filter-btn { padding: 5px 11px; background: #2a2a2a; border: 1px solid #444; color: #bbb; border-radius: 14px; cursor: pointer; font-size: 12px; transition: all 0.15s; min-width: 0; }
+    .filter-btn:hover { color: #fff; border-color: #4ab4ff; background: #333; }
+    .filter-btn.active { background: #4ab4ff; color: #fff; border-color: #4ab4ff; font-weight: 600; }
+    .filter-count { margin-left: auto; color: #777; font-size: 12px; }
+    @media (max-width: 600px) { .filter-row { margin: 8px 0 0 0; } }
     .action-buttons { display: flex; gap: 10px; }
     button { min-width: 140px; padding: 5px 30px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; }
     button:hover { background: rgba(255,255,255,0.3); }
@@ -488,11 +495,36 @@
         resultsEl.appendChild(d);
       }
     }
+    // ── Filters ────────────────────────────────────────────────────────────
+    // Card-level data is title-only, so filters use title regexes plus the
+    // genre/type fields we preserved at load time. \b word boundaries keep
+    // VR from matching titles like "Universe of Verse"; PSVR2 is folded
+    // into the VR filter on purpose.
+    let activeFilter='all';
+    const FILTERS={
+      all:    ()=>true,
+      vr:     g=>/\b(VR|PSVR2?)\b/i.test(g.title) || /\b(VR|PSVR)\b/i.test(g._genre||''),
+      demo:   g=>/\b(demo|trial)\b/i.test(g.title) || /\bdemo\b/i.test(g._type||''),
+      dlc:    g=>/\b(DLC|expansion|season pass)\b/i.test(g.title) || /\b(dlc|addon|add-on)\b/i.test(g._type||''),
+      update: g=>/\b(update|patch|fix)\b/i.test(g.title),
+    };
     function doSearch(){
       const t=searchInput.value.trim().toLowerCase();
-      filtered=t?allGames.filter(g=>g.title.toLowerCase().includes(t)):allGames.slice();
+      const fn=FILTERS[activeFilter]||FILTERS.all;
+      filtered=allGames.filter(fn).filter(g=>!t||g.title.toLowerCase().includes(t));
       renderGames(filtered);
+      const fc=document.getElementById('filterCount');
+      if(fc) fc.textContent = (activeFilter==='all'&&!t)?'':`${filtered.length} of ${allGames.length}`;
     }
+    document.querySelectorAll('.filter-btn').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        const cur=document.querySelector('.filter-btn.active');
+        if(cur)cur.classList.remove('active');
+        btn.classList.add('active');
+        activeFilter=btn.dataset.filter;
+        doSearch();
+      });
+    });
 
     // ── Boot ──────────────────────────────────────────────────────────────────
     window.addEventListener('DOMContentLoaded', async()=>{
@@ -504,7 +536,7 @@
       showProg('Loading library…');
       try {
         const arr=await loadCache();
-        allGames=arr.map(e=>({url:e.url||'',title:e.title||'',image:findCover(e.screenshots)}));
+        allGames=arr.map(e=>({url:e.url||'',title:e.title||'',image:findCover(e.screenshots),_genre:(e.extra&&e.extra.genre)||'',_type:(e.extra&&e.extra.type)||''}));
         filtered=allGames.slice(); renderGames(allGames);
         showStatus(`Loaded ${allGames.length} games`);
       } catch(e) {
@@ -568,7 +600,7 @@
       setBtns(false);showProg('Refreshing…');
       try {
         const arr=await loadCache(true);
-        allGames=arr.map(e=>({url:e.url||'',title:e.title||'',image:findCover(e.screenshots)}));
+        allGames=arr.map(e=>({url:e.url||'',title:e.title||'',image:findCover(e.screenshots),_genre:(e.extra&&e.extra.genre)||'',_type:(e.extra&&e.extra.type)||''}));
         filtered=allGames.slice();doSearch();
         showStatus(`Refreshed ${allGames.length} games`);
       } catch(e){showStatus('Refresh failed: '+(e.message||e),false);}
