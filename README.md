@@ -1,4 +1,5 @@
 <div align="center">
+<img width="1920" height="1032" alt="image" src="https://github.com/user-attachments/assets/b0f448e9-e1eb-4aea-9525-c9d2cf0a0617" />
 
 # 🎮 PS5 Game Browser
 
