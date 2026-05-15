@@ -1,4 +1,4 @@
-name: Build PS4 Game Browser
+name: Build PS5 Game Browser
 
 on:
   push:
@@ -83,7 +83,7 @@ jobs:
               owner: context.repo.owner,
               repo:  context.repo.repo,
               tag_name: tag,
-              name:     `PS4 Game Browser ${tag}`,
+              name:     `PS5 Game Browser ${tag}`,
               draft:    true,
               prerelease: false,
               generate_release_notes: true,
@@ -123,6 +123,18 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+
+      # On macos-14 the dtolnay action occasionally installs the toolchain
+      # without setting it as the rustup default — leaving `cargo` as a
+      # rustup-init shim that fails with "unexpected argument 'metadata' found".
+      # Setting the default explicitly fixes it; the version print verifies.
+      - name: Set rustup default + verify
+        shell: bash
+        run: |
+          rustup default stable
+          rustup show
+          cargo --version
+          rustc --version
 
       - name: Install Linux dependencies (Tauri v2)
         if: matrix.platform == 'ubuntu-22.04'
@@ -167,17 +179,26 @@ jobs:
           set -euo pipefail
           # `find` is authoritative — tauri-action's artifactPaths is sometimes
           # incomplete (drops sub-bundles).
-          BUNDLE_DIR=$(find src-tauri/target -type d -path '*/release/bundle' | head -1)
-          if [ -z "$BUNDLE_DIR" ] || [ ! -d "$BUNDLE_DIR" ]; then
-            echo "::error::no bundle directory found under src-tauri/target"
-            exit 1
+          #
+          # PORTABLE OUTPUTS:
+          #   Windows: src-tauri/target/release/<binary>.exe  (raw exe — built by cargo)
+          #   macOS:   src-tauri/target/<arch>/release/bundle/macos/<Product>.app  (we zip it)
+          #   Linux:   src-tauri/target/release/bundle/appimage/<binary>_<ver>_amd64.AppImage
+          #
+          # Bundle dir only relevant for macOS and Linux. Windows builds no bundle.
+          if [ "$LABEL" != "windows" ]; then
+            BUNDLE_DIR=$(find src-tauri/target -type d -path '*/release/bundle' | head -1)
+            if [ -z "$BUNDLE_DIR" ] || [ ! -d "$BUNDLE_DIR" ]; then
+              echo "::error::no bundle directory found under src-tauri/target"
+              exit 1
+            fi
+            echo "Bundle directory: $BUNDLE_DIR"
+            find "$BUNDLE_DIR" -type f -o -type d -name '*.app' | sort
           fi
-          echo "Bundle directory: $BUNDLE_DIR"
-          find "$BUNDLE_DIR" -type f | sort
 
           upload() {
             local SRC="$1"; local NEW_NAME="$2"
-            if [ -z "$SRC" ] || [ ! -f "$SRC" ]; then
+            if [ -z "$SRC" ] || [ ! -e "$SRC" ]; then
               echo "  skip (not found): $NEW_NAME"
               return 1
             fi
@@ -189,29 +210,45 @@ jobs:
           }
 
           # Filenames include the tag for discoverability outside the app:
-          # users who download "PS4 Game Browser v4.0.0.exe" can tell at a
+          # users who download "PS5 Game Browser v4.0.0.exe" can tell at a
           # glance which version they have. The in-app updater matches by
           # file extension + arch substring, so it doesn't care about the
           # version part of the name.
           case "$LABEL" in
             windows)
-              SRC=$(find "$BUNDLE_DIR" -type f -name '*setup.exe' | head -1)
-              upload "$SRC" "PS4 Game Browser $TAG.exe"
+              # Raw portable exe — Tauri 2 always builds this at target/release/<binary>.exe
+              # regardless of bundle.targets. Drop NSIS entirely.
+              SRC=$(find src-tauri/target/release -maxdepth 1 -name 'ps5-game-browser.exe' -type f | head -1)
+              upload "$SRC" "PS5 Game Browser $TAG.exe"
               ;;
             mac-arm)
-              SRC=$(find "$BUNDLE_DIR" -type f -name '*.dmg' | head -1)
-              upload "$SRC" "PS4 Game Browser ${TAG}_aarch64.dmg"
+              # Zip the .app bundle. `ditto -ck --sequesterRsrc --keepParent`
+              # is the macOS-native way to zip preserving HFS+ metadata and
+              # the .app top-level directory (so unzip recreates "PS5 Game Browser.app").
+              APP=$(find "$BUNDLE_DIR/macos" -maxdepth 1 -name '*.app' -type d | head -1)
+              if [ -n "$APP" ]; then
+                ZIP_PATH="$BUNDLE_DIR/macos/PS5 Game Browser ${TAG}_aarch64.app.zip"
+                (cd "$(dirname "$APP")" && ditto -ck --sequesterRsrc --keepParent "$(basename "$APP")" "$ZIP_PATH")
+                upload "$ZIP_PATH" "PS5 Game Browser ${TAG}_aarch64.app.zip"
+              else
+                echo "::error::no .app found at $BUNDLE_DIR/macos"
+                exit 1
+              fi
               ;;
             mac-intel)
-              SRC=$(find "$BUNDLE_DIR" -type f -name '*.dmg' | head -1)
-              upload "$SRC" "PS4 Game Browser ${TAG}_x64.dmg"
+              APP=$(find "$BUNDLE_DIR/macos" -maxdepth 1 -name '*.app' -type d | head -1)
+              if [ -n "$APP" ]; then
+                ZIP_PATH="$BUNDLE_DIR/macos/PS5 Game Browser ${TAG}_x64.app.zip"
+                (cd "$(dirname "$APP")" && ditto -ck --sequesterRsrc --keepParent "$(basename "$APP")" "$ZIP_PATH")
+                upload "$ZIP_PATH" "PS5 Game Browser ${TAG}_x64.app.zip"
+              else
+                echo "::error::no .app found at $BUNDLE_DIR/macos"
+                exit 1
+              fi
               ;;
             linux)
-              # Tauri's Linux build produces BOTH .AppImage and .deb
               APPIMAGE=$(find "$BUNDLE_DIR" -type f -name '*.AppImage' | head -1)
-              DEB=$(find "$BUNDLE_DIR" -type f -name '*.deb' | head -1)
-              upload "$APPIMAGE" "PS4 Game Browser ${TAG}_amd64.AppImage" || true
-              upload "$DEB"      "PS4 Game Browser ${TAG}_amd64.deb"      || true
+              upload "$APPIMAGE" "PS5 Game Browser ${TAG}_amd64.AppImage"
               ;;
             *)
               echo "::error::unknown label: $LABEL"
