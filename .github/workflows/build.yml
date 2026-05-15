@@ -204,7 +204,9 @@ jobs:
             fi
             local STAGED
             STAGED="$(dirname "$SRC")/$NEW_NAME"
-            cp -f "$SRC" "$STAGED"
+            if [ "$SRC" != "$STAGED" ]; then
+              cp -f "$SRC" "$STAGED"
+            fi
             echo "  uploading: $NEW_NAME"
             gh release upload "$TAG" "$STAGED" --clobber --repo "$REPO"
           }
