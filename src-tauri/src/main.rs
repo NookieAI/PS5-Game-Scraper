@@ -57,7 +57,7 @@ async fn check_for_updates() -> Result<UpdateInfo, String> {
 
     if !is_newer(&latest, &current) {
         return Ok(UpdateInfo {
-            available: false, current, latest: Some(latest),
+            available: false, current, latest: Some(latest.clone()),
             download_url: None, asset_name: None, asset_size: None,
             release_url, notes, error: None,
         });
@@ -67,7 +67,7 @@ async fn check_for_updates() -> Result<UpdateInfo, String> {
         Some(asset) => Ok(UpdateInfo {
             available:    true,
             current,
-            latest:       Some(latest),
+            latest:       Some(latest.clone()),
             download_url: Some(asset.browser_download_url.clone()),
             asset_name:   Some(asset.name.clone()),
             asset_size:   Some(asset.size),
@@ -78,7 +78,7 @@ async fn check_for_updates() -> Result<UpdateInfo, String> {
         None => Ok(UpdateInfo {
             available:    true,
             current,
-            latest:       Some(latest),
+            latest:       Some(latest.clone()),
             download_url: None,
             asset_name:   None,
             asset_size:   None,
