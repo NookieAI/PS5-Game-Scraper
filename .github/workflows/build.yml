@@ -102,12 +102,12 @@ jobs:
             label:    windows
             target:   x86_64-pc-windows-msvc
             args:     ''
-          - platform: macos-14            # Apple Silicon
+          - platform: macos-14            # Apple Silicon — builds ARM natively
             label:    mac-arm
             target:   aarch64-apple-darwin
             args:     '--target aarch64-apple-darwin'
-          - platform: macos-13            # Intel
-            label:    mac-intel
+          - platform: macos-14            # Apple Silicon — cross-compiles to Intel
+            label:    mac-intel           # macos-13 is deprecated; macos-14 cross-builds x86_64 fine
             target:   x86_64-apple-darwin
             args:     '--target x86_64-apple-darwin'
           - platform: ubuntu-22.04
