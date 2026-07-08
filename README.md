@@ -4,6 +4,10 @@
 # 🎮 PS5 Game Browser
 
 **Browse, search, and download from a huge PS5 game library — all from one clean desktop app.**
+
+[![Latest Release](https://img.shields.io/github/v/release/NookieAI/PS5-Game-Scraper?label=latest&color=0070d1&style=for-the-badge)](https://github.com/NookieAI/PS5-Game-Scraper/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/NookieAI/PS5-Game-Scraper/total?color=0070d1&style=for-the-badge)](https://github.com/NookieAI/PS5-Game-Scraper/releases)
+[![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-0070d1?style=for-the-badge)](#-install)
 </div>
 
 ---
